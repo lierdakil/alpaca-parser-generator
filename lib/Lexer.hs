@@ -222,7 +222,7 @@ writeLexer dfa CPP = "\
     \curChIx = lastAccChIx;\
     \" <> returnResult <> "\
     \if (curChIx >= input.size()) { \
-    \if (debug) std::cerr << \"Got EOF while parsing \\\"\" << text << \"\\\"\" << std::endl; \
+    \if (debug) std::cerr << \"Got EOF while lexing \\\"\" << text << \"\\\"\" << std::endl; \
     \return mkToken(TokenType::eof); }\
     \throw std::runtime_error(\"Unexpected input: \" + buf);\
   \}\
@@ -236,7 +236,7 @@ writeLexer dfa CPP = "\
   returnResult = concat (foldr ((:) . returnResult1) [] accSt)
   returnResult1 (st, (Just name, act))
     = "if (accSt == "<> show st <>") { \
-      \if (debug) std::cerr << \"Parsed token " <> name <> ": \\\"\" << text << \"\\\"\" << std::endl; \
+      \if (debug) std::cerr << \"Lexed token " <> name <> ": \\\"\" << text << \"\\\"\" << std::endl; \
       \return mkToken(TokenType::Tok_" <> name <> mkAct act <>"); }"
   returnResult1 (st, (Nothing, _))
     = "if (accSt == "<> show st <>") { \

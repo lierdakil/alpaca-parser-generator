@@ -1,4 +1,4 @@
-module Grammar (Symbol(..), Rule(..), Alt, parse) where
+module Grammar (Symbol(..), Rule(..), Alt, parse, showBody, showSymbol) where
 
 import GrammarLex
 import GrammarParse
@@ -16,3 +16,11 @@ scan s = either error id $ runAlex s go
     (tok :) <$> if tok /= TEOF
                 then go
                 else return []
+
+showBody :: [Symbol] -> String
+showBody = unwords . map showSymbol
+
+showSymbol :: Symbol -> String
+showSymbol TermEof = "%eof"
+showSymbol (Term t) = t
+showSymbol (NonTerm t) = t

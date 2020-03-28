@@ -33,6 +33,7 @@ library
                      , containers
                      , mtl
                      , array
+                     , table-layout
   ghc-options:         -Wall
   default-language:    Haskell2010
 

@@ -59,17 +59,11 @@ buildAlternatives ars h xs = intercalate " else " (map (buildAlt ars h) xs) <> e
 printDebug :: String -> [Symbol] -> String
 printDebug h b = "if (debug) std::cerr << \"" <> h <> " -> " <> showBody b <> "\" << std::endl;"
 
-showBody :: [Symbol] -> String
-showBody = unwords . map showSymbol
-  where showSymbol TermEof = "%eof"
-        showSymbol (Term t) = t
-        showSymbol (NonTerm t) = t
-
 buildAlt :: ActionableRules -> String -> Alt -> String
 buildAlt _ h ([], act) = "{" <> printDebug h [] <> buildAction act <> "}"
 buildAlt ars h (Term s:b, act) = "if(curTok.type == TokenType::Tok_"<>s<>"){\
   \"<> printDebug h (Term s:b) <> "\
-  \auto val_1 = curTok; curTok = lex->getNextToken();"
+  \auto _1 = curTok; curTok = lex->getNextToken();"
   <> buildBody ars (zip [2..] b) <> buildAction act
   <> "}"
 buildAlt _ h (b, _) = error $ "Can not handle body " <> h <> " -> " <> showBody b
@@ -92,4 +86,4 @@ buildBody ars = concatMap go
   \auto " <> val n <> " = curTok;\
   \curTok = lex->getNextToken();\
   \"
-  val = ("val_" <>) . show
+  val = ("_" <>) . show

@@ -52,7 +52,7 @@ Symbol
   | teof                  { TermEof }
 
 {
-data Symbol = TermEof | Term String | NonTerm String deriving (Eq, Show)
+data Symbol = TermEof | Term String | NonTerm String deriving (Eq, Ord, Show)
 data Rule = Rule String [([Symbol], Maybe String)] deriving (Eq, Show)
 
 parseError :: [Token] -> a
