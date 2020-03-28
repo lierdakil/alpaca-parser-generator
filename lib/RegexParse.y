@@ -1,0 +1,112 @@
+{
+module RegexParse where
+
+import RegexLex
+import qualified Data.List.NonEmpty as NE
+}
+
+%name regex
+%tokentype { Token }
+%error { parseError }
+%token
+  '['  { TLBrace }
+  ']'  { TRBrace }
+  '('  { TLParen }
+  ')'  { TRParen }
+  '.'  { TDot }
+  '*'  { TStar }
+  '+'  { TPlus }
+  '?'  { TQuest }
+  '-'  { TDash }
+  '|'  { TAlt }
+  c    { TChar $$ }
+  name { TName $$ }
+  act  { TAction $$ }
+  eof  { TEOF }
+
+%left '|'
+
+%%
+
+Def
+  : MbName Exp MbAct eof { RegexDef $1 $2 $3 }
+
+MbName
+  : name { Just $1 }
+  |      { Nothing }
+
+MbAct
+  : act { Action $1 }
+  |     { NoAction }
+
+Exp
+  : ExpSeq         { reverse $1 }
+  | Exp '|' ExpSeq { buildAlt $1 (reverse $3) }
+
+ExpSeq
+  : ExpSeq Single1  { $2 $1 }
+  |                { [] }
+
+Single1
+  : Single     { ($1:) }
+  | '(' Exp ')' { ($2<>) }
+
+Single
+  : '[' Grp ']' { PGroup $2 }
+  | Char        { PGroup (pure $1) }
+  | SubExp '*'  { PKleene $1 }
+  | SubExp '+'  { PPositive $1 }
+  | SubExp '?'  { PMaybe $1 }
+
+SubExp
+  : '[' Grp ']' { [PGroup $2] }
+  | Char        { [PGroup (pure $1)] }
+  | '(' Exp ')' { $2 }
+
+Char
+  : '.' { CAny }
+  | c   { CChar $1 }
+
+Rng
+  : c '-' c { CRange $1 $3 }
+
+CRng
+  : Char { $1 }
+  | Rng  { $1 }
+
+Grp
+  : CRng GrpCont  { $1 NE.:| $2 }
+
+GrpCont
+  : CRng GrpCont { $1 : $2 }
+  |              { [] }
+
+{
+data RegexDef = RegexDef (Maybe String) RegexPattern Action
+  deriving Show
+
+data Action = NoAction | Action String deriving (Show, Eq, Ord)
+
+data CharPattern =
+    CChar Char
+  | CRange Char Char
+  | CAny
+  deriving (Show, Eq, Ord)
+
+data RegexPatternSingle =
+    PGroup (NE.NonEmpty CharPattern)
+  | PKleene RegexPattern
+  | PPositive RegexPattern
+  | PMaybe RegexPattern
+  | PAlternative [RegexPattern]
+  deriving Show
+
+type RegexPattern = [RegexPatternSingle]
+
+buildAlt :: RegexPattern -> RegexPattern -> RegexPattern
+buildAlt [PAlternative x] neu = [PAlternative (neu:x)]
+buildAlt x neu = [PAlternative [neu, x]]
+
+parseError :: [Token] -> a
+parseError x = error $ "Parse error at" <> show x
+}

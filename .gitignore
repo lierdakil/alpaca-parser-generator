@@ -1,0 +1,7 @@
+/.ccls-cache
+/*.xy
+/*.h
+/*.cpp
+/dist
+/dist-newstyle
+/a.out
