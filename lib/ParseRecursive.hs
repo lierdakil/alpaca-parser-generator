@@ -61,7 +61,7 @@ printDebug h b = "if (debug) std::cerr << \"" <> h <> " -> " <> showBody b <> "\
 
 showBody :: [Symbol] -> String
 showBody = unwords . map showSymbol
-  where showSymbol TermEof = "eof"
+  where showSymbol TermEof = "%eof"
         showSymbol (Term t) = t
         showSymbol (NonTerm t) = t
 

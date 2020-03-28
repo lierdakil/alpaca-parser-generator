@@ -185,6 +185,7 @@ writeLexer dfa CPP = "\
 \#define LEXER_H\n\
 \#include <string>\n\
 \#include <stdexcept>\n\
+\#include <iostream>\n\
 \enum class TokenType { eof, " <> intercalate "," (map ("Tok_"<>) tokNames) <> "};\
 \std::string to_string(TokenType tt) { switch(tt) {" <> tokReflect <> " }}\
 \\n\
@@ -199,8 +200,10 @@ writeLexer dfa CPP = "\
 \class Lexer {\
   \std::string input;\
   \std::size_t curChIx;\
+  \bool debug;\
 \public:\
-  \Lexer(const std::string &input) : input(input), curChIx(0) {}\
+  \Lexer(const std::string &input, bool debug=false) \
+  \: input(input), curChIx(0), debug(debug) {}\
   \Token getNextToken() {\
     \std::string buf;\
     \std::string text;\
@@ -218,7 +221,9 @@ writeLexer dfa CPP = "\
     \}\
     \curChIx = lastAccChIx;\
     \" <> returnResult <> "\
-    \if (curChIx >= input.size()) { auto res = mkToken(TokenType::eof); return res; }\
+    \if (curChIx >= input.size()) { \
+    \if (debug) std::cerr << \"Got EOF while parsing \\\"\" << text << \"\\\"\" << std::endl; \
+    \return mkToken(TokenType::eof); }\
     \throw std::runtime_error(\"Unexpected input: \" + buf);\
   \}\
   \int transTable(char curCh, int curSt) { " <> transTable <> " return -1; } \
@@ -230,9 +235,13 @@ writeLexer dfa CPP = "\
   tokNames = nub $ mapMaybe (fst . snd) accSt
   returnResult = concat (foldr ((:) . returnResult1) [] accSt)
   returnResult1 (st, (Just name, act))
-    = "if (accSt == "<> show st <>") { auto res = mkToken(TokenType::Tok_" <> name <> mkAct act <>"); return res; }"
+    = "if (accSt == "<> show st <>") { \
+      \if (debug) std::cerr << \"Parsed token " <> name <> ": \\\"\" << text << \"\\\"\" << std::endl; \
+      \return mkToken(TokenType::Tok_" <> name <> mkAct act <>"); }"
   returnResult1 (st, (Nothing, _))
-    = "if (accSt == "<> show st <>") { return getNextToken(); }"
+    = "if (accSt == "<> show st <>") { \
+      \if (debug) std::cerr << \"Skipping state " <> show st <> ": \\\"\" << text << \"\\\"\" << std::endl; \
+      \return getNextToken(); }"
   mkAct NoAction = ""
   mkAct (Action act) = "," <> act
   checkAccState = "if( "
