@@ -13,6 +13,7 @@ import Data.Function
 import Control.Arrow
 import RegexParse
 import RegexLex (alexMonadScan, runAlex, Token(..))
+import Grammar (Symbol(..))
 
 type StateAttr = Maybe (Maybe String, Action)
 type NFA = IM.IntMap (StateAttr, M.Map (Maybe (NE.NonEmpty CharPattern)) [Int])
@@ -176,18 +177,21 @@ buildDFA defs = simplifyDFA . nfaToDFA $ evalState (buildNFA defs) 0
 
 data Lang = CPP
 
-makeLexer :: [String] -> Lang -> String
+makeLexer :: [String] -> Lang -> ([Symbol], String)
 makeLexer = writeLexer . buildDFA . map (regex . scanLine)
 
-writeLexer :: DFA -> Lang -> String
-writeLexer dfa CPP = "\
+writeLexer :: DFA -> Lang -> ([Symbol], String)
+writeLexer dfa CPP = (,) terminals $ "\
 \#ifndef LEXER_H\n\
 \#define LEXER_H\n\
 \#include <string>\n\
 \#include <stdexcept>\n\
 \#include <iostream>\n\
-\enum class TokenType { eof, " <> intercalate "," (map ("Tok_"<>) tokNames) <> "};\
-\std::string to_string(TokenType tt) { switch(tt) {" <> tokReflect <> " }}\
+\enum class TokenType : std::size_t { eof, " <> intercalate "," (map ("Tok_"<>) tokNames) <> "};\
+\std::string to_string(TokenType tt) { \
+\static constexpr const char *names[] = {" <> tokReflect <> " };\
+\return names[static_cast<std::size_t>(tt)];\
+\}\
 \\n\
 \#if __has_include(\"token.h\")\n\
 \#include \"token.h\"\n\
@@ -230,8 +234,9 @@ writeLexer dfa CPP = "\
 \};\n\
 \#endif\n"
   where
-  tokReflect = "case TokenType::eof: return \"%eof\";" <> concatMap tokReflect1 tokNames
-  tokReflect1 tn = "case TokenType::Tok_" <> tn <> ": return \"" <> tn <> "\";"
+  terminals = TermEof : map Term tokNames
+  tokReflect = intercalate "," . map (\x -> '"':x <> "\"") $ "%eof":tokNames
+  -- tokReflect1 tn = "case TokenType::Tok_" <> tn <> ": return \"" <> tn <> "\";"
   tokNames = nub $ mapMaybe (fst . snd) accSt
   returnResult = concat (foldr ((:) . returnResult1) [] accSt)
   returnResult1 (st, (Just name, act))
