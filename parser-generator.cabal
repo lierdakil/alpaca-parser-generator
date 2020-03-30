@@ -23,12 +23,14 @@ library
                      , ParseRecursive
                      , ParseLL
                      , ParseLR
+                     , ParseSLR
                      , ParseLALR
   other-modules:       RegexLex
                      , RegexParse
                      , GrammarLex
                      , GrammarParse
                      , Grammar
+                     , FA
   build-depends:       base >= 4 && < 5
                      , containers
                      , mtl
