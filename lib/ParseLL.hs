@@ -9,7 +9,6 @@ import qualified Data.Set as S
 import qualified Data.Map as M
 import Text.Layout.Table
 import Control.Monad
-import Control.Monad.State
 
 type RulesMap = M.Map String [Alt]
 type Rules = [Rule]
@@ -27,16 +26,16 @@ buildLLParser tokens rules = "\
 \/*\n" <> printTable t <> "\n*/\n\
 \#ifndef PARSER_LL_H\n\
 \#define PARSER_LL_H\n\
-\#include <string>\n\
-\#include <initializer_list>\n\
-\#include <vector>\n\
-\#include <variant>\n\
+\#include \"lexer.h\"\n\
+\#include \"parseResult.h\"\n\
 \#include <stack>\n\
 \#include <stdexcept>\n\
-\#include \"lexer.h\"\n\
+\#include <string>\n\
+\#include <variant>\n\
+\#include <functional>\n\
 \class ParserLL {\
   \enum class NonTerminal : std::size_t { "<>intercalate ", " (map ("NT_" <>) nonTerms)<>" };\
-  \using Symbol = std::variant<NonTerminal, TokenType>;\
+  \using Symbol = std::variant<NonTerminal, TokenType, std::size_t>;\
   \static std::string to_string(NonTerminal nt) {\
   \static constexpr const char *names[] = {"
   <> intercalate "," (map quote nonTerms) <> " };\
@@ -46,62 +45,48 @@ buildLLParser tokens rules = "\
   \Token curTok;\
   \bool debug;\
   \std::stack<Symbol> stack;\
-  \"<>bodies<>"\
-  \static constexpr const std::initializer_list<Symbol>* M[]["
-  <>show (length tokens)<>"] = {" <> transTable <> "};\
-  \std::string sym_to_string(Symbol x) {\
-    \return std::visit(\
-        \[](auto &&X) {\
-          \using U = std::decay_t<decltype(X)>;\
-          \if constexpr (std::is_same_v<U, TokenType>) {\
-            \return ::to_string(X);\
-          \} else if constexpr (std::is_same_v<U, NonTerminal>) {\
-            \return ParserLL::to_string(X);\
-          \}\
-        \},\
-        \x);\
-      \}\
+  \std::stack<std::variant<ResultType,Token>> resultStack;\
+  \static constexpr const std::size_t M[]["
+  <>show (length tokens)<>"][2] = {" <> transTable <> "};\
 \public:\
   \ParserLL(Lexer *lex, bool debug = false):lex(lex),debug(debug) {}\
-  \void parse() {\
+  \ResultType parse() {\
     \stack.push("<> encodeSymbol startSymbol <> ");\
     \Token a = lex->getNextToken();\
     \while (!stack.empty()) {\
       \std::visit(\
-          \[&a, this](auto &&X) {\
+          \[&a, this](auto X) {\
             \using T = std::decay_t<decltype(X)>;\
             \if constexpr (std::is_same_v<T, TokenType>) {\
               \if (a.type == X) {\
+                \resultStack.push(a);\
                 \a = lex->getNextToken();\
                 \stack.pop();\
               \} else {\
                 \throw std::runtime_error(\
                     \\"Found terminal \" + ::to_string(a.type) + \" but expected \" +\
-                    \sym_to_string(X) + \".\");\
+                    \::to_string(X) + \".\");\
               \}\
             \} else if constexpr (std::is_same_v<T, NonTerminal>) {\
-              \auto trans_ptr = M[static_cast<std::size_t>(X)]\
+              \auto trans = M[static_cast<std::size_t>(X)]\
                                 \[static_cast<std::size_t>(a.type)];\
-              \if (!trans_ptr)\
-              \throw std::runtime_error(\
-              \\"No transition for \"+to_string(X)+\
-              \\", \"+::to_string(a.type));\
-              \auto const &trans = *trans_ptr;\
-              \if (debug) {\
-                \std::cerr << to_string(X) << \" -> \";\
-                \for (auto &i : trans) {\
-                  \std::cerr << sym_to_string(i) << \" \";\
-                \}\
-                \std::cerr << std::endl;\
-              \}\
               \stack.pop();\
-              \for (auto i = trans.end()-1, end = trans.begin()-1; i != end; --i) {\
-                \stack.push(*i);\
+              \stack.push(trans[1]);\
+              \switch(trans[0]) {\
+              \"<>bodies<>"\
+              \case 0: throw std::runtime_error(\
+                      \\"No transition for \"+to_string(X)+\
+                      \\", \"+::to_string(a.type));\
+              \}\
+            \} else if constexpr (std::is_same_v<T, std::size_t>) {\
+              \stack.pop();\
+              \switch(X) {\
+              \"<>actions<>"\
               \}\
             \}\
-          \},\
-          \stack.top());\
+          \}, stack.top());\
     \}\
+    \return std::get<0>(resultStack.top());\
   \}\
 \};\n\
 \#endif\n\
@@ -113,28 +98,44 @@ buildLLParser tokens rules = "\
   t = buildTable r
   nonTerms = M.keys r
   allBodies = nub $ map snd $ M.keys t
-  allActions = concatMap (\(Rule _ alts) -> mapMaybe snd alts) rules
-  transTable = makeTransTable (map NonTerm nonTerms) tokens t
-  bodies = concatMap (uncurry makeBody) $ zip [0..] allBodies
-  makeBody n b = "static constexpr const std::initializer_list<Symbol> body" <> show n <>" = {"
-    <> intercalate "," (map encodeSymbol b)
-    <> "};"
+  allActions = nub $ concatMap (\(Rule _ alts) -> mapMaybe traverse' alts) rules
+  traverse' (_, Nothing) = Nothing
+  traverse' (x, Just v) = Just (x, v)
+  transTable = makeTransTable
+  bodies = concatMap (uncurry makeBody) $ zip [1::Word ..] allBodies
+  actions = concatMap (uncurry makeAction) $ zip [1::Word ..] allActions
+  makeBody n b = "case " <> show n <>": "
+    <> "if(debug) std::cerr << to_string(X) << \" -> " <> showBody b <> "\" << std::endl;"
+    <> concatMap (\s -> "stack.push(" <> encodeSymbol s <> ");") (reverse b)
+    <> "break;"
+  makeAction n (body, code)
+    = "case " <> show n <>": {"
+    <> concat (reverse $ zipWith showArg body [1::Word ..])
+    <> "resultStack.push(([]("<>argDefs<>") {" <> code <> "})("<>args<>"));"
+    <> "break; }"
+    where
+      argDefs = intercalate "," $ zipWith showArgDef body [1::Word ..]
+      args = intercalate "," $ zipWith showCallArg body [1::Word ..]
+      showArgDef _ i = "const auto &_" <> show i
+      showCallArg _ i = "_" <> show i
+      showArg (NonTerm _) i = "auto _"<>show i<>"=std::get<0>(resultStack.top()); resultStack.pop();"
+      showArg _ i = "auto _"<>show i<>"=std::get<1>(resultStack.top()); resultStack.pop();"
 
-  makeTransTable :: [Symbol] -> [Symbol] -> Table -> String
-  makeTransTable nonterms tokens tbl = tblStr
+  makeTransTable = tblStr
     where
       bodyMap = M.fromList $ zip allBodies [(0::Word)..]
-      actionMap = M.fromList $ zip allActions [(0::Word)..]
-      tblStr = intercalate "," $ map mkTblRow cells
-      mkTblRow row = "{"<> intercalate "," (map (showIdx . fst) row) <>"}"
-      showIdx Nothing = "nullptr";
-      showIdx (Just x) = "&body" <> show x;
-      cells = map (flip map tokens . writeCell) nonterms
+      actionMap = M.fromList $ zip (map snd allActions) [(0::Word)..]
+      tblStr = intercalate ","
+             $ map (\row -> "{"<> intercalate "," (map showIdxs row) <>"}") cells
+      showIdxs (a, b) = "{" <> showIdx a <> "," <> showIdx b <> "}"
+      showIdx Nothing = "0"
+      showIdx (Just x) = show (x+1)
+      cells = map (flip map tokens . writeCell) nonTerms
       writeCell nonterm term
-        | Just (act, b:_) <- M.lookup (nonterm, term) tt
+        | Just (act, b:_) <- M.lookup (NonTerm nonterm, term) tt
         = (M.lookup b bodyMap, act >>= flip M.lookup actionMap)
         | otherwise = (Nothing, Nothing)
-      tt = M.fromListWith (liftM2 (++)) . concatMap r2t $ M.toList tbl
+      tt = M.fromListWith (liftM2 (++)) . concatMap r2t $ M.toList t
       r2t ((nt, b), (ts, act)) = map (\term -> ((nt, term), (act, [b]))) $ S.toList ts
 
 tableToCode :: Table -> String
