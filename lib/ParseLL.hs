@@ -1,10 +1,9 @@
 {-# LANGUAGE FlexibleContexts #-}
-module ParseLL where
+module ParseLL (makeLLParser) where
 
 import Grammar
 import Data.Maybe
 import Data.List
-import Data.Function
 import qualified Data.Set as S
 import qualified Data.Map as M
 import Text.Layout.Table
@@ -131,22 +130,6 @@ buildLLParser tokens rules = "\
         | otherwise = (Nothing, Nothing)
       tt = M.fromListWith (liftM2 (++)) . concatMap r2t $ M.toList t
       r2t ((nt, b), (ts, act)) = map (\term -> ((nt, term), (act, [b]))) $ S.toList ts
-
-tableToCode :: Table -> String
-tableToCode t = "switch (nonTerminal) {" <>
-  concatMap constructCase (groupBy ((==) `on` fst . fst) $ M.toList t)
-  <> "}" <>
-  "throw std::runtime_error(\
-  \\"No transition for \"+to_string(nonTerminal)+\
-  \\", \"+::to_string(terminal));"
-  where
-  constructCase xs@(((nt, _), _):_) = "case " <> encodeSymbol nt <> ":" <>
-    intercalate " else " (map constructCond xs) <> "break;"
-  constructCase _ = ""
-  constructCond ((_, bs), (terms, _)) = "if(" <> termCond <> ") " <> handleBodies bs
-    where
-      termCond = intercalate "||" $ map (("terminal=="<>) . encodeSymbol)$ S.toList terms
-      handleBodies b = "return {" <> intercalate "," (map encodeSymbol b) <> "};"
 
 encodeSymbol :: Symbol -> String
 encodeSymbol (NonTerm nt) = "NonTerminal::NT_" <> nt
