@@ -4,7 +4,7 @@
            , ScopedTypeVariables
            , TupleSections
            #-}
-module ParseLR (Proxy(..), LR1Point, LR0Point, makeLRParser, buildLRAutomaton) where
+module ParseLR (Proxy(..), LRPoint(..), LR1Point(..), LR0Point(..), makeLRParser, buildLRAutomaton) where
 
 import Grammar
 import qualified Data.Set as S
@@ -105,34 +105,30 @@ writeLRParser name tokens rules t = "\
 \#include <stdexcept>\n\
 \#include <string>\n\
 \#include <variant>\n\
-\#include <functional>\n\
 \class "<>name<>" {\
   \Lexer *lex;\
   \bool debug;\
-  \std::stack<std::size_t> stack;\
-  \std::stack<std::variant<ResultType,Token>> resultStack;\
+  \std::stack<std::pair<std::size_t,std::variant<ResultType,Token>>> stack;\
   \static constexpr const std::size_t Action[]["
   <>show (length tokens)<>"] = {" <> actionTable <> "};\
   \static constexpr const std::size_t GOTO[]["
   <>show (length nonTerminals)<>"] = {" <> gotoTable <> "};\
+  \auto top() const { return stack.empty() ? 0 : stack.top().first; }\
 \public:\
   \"<>name<>"(Lexer *lex, bool debug = false):lex(lex),debug(debug) {}\
   \ResultType parse() {\
-    \stack.push(0);\
     \Token a = lex->getNextToken();\
-    \while (!stack.empty()) {\
-      \auto action = Action[stack.top()][static_cast<std::size_t>(a.type)];\
+    \while (true) {\
+      \auto action = Action[top()][static_cast<std::size_t>(a.type)];\
       \switch (action) {\
       \"<> concatMap writeAction actionsMapList <> "\
       \default:\
         \if(debug)std::cerr<<\"Shift to \"<<action<<std::endl;\
-        \stack.push(action);\
-        \resultStack.push(a);\
+        \stack.push({action, a});\
         \a=lex->getNextToken();\
         \break;\
       \}\
     \}\
-    \throw new std::runtime_error(\"Empty stack while still parsing\");\
   \}\
 \};\n\
 \#endif\n\
@@ -175,7 +171,7 @@ writeLRParser name tokens rules t = "\
   writeAction (a, n) = "case " <> show n <> ": "
     <> actionBody a
     <> "break;"
-  actionBody Accept = "return std::get<0>(resultStack.top());"
+  actionBody Accept = "return std::get<0>(stack.top().second);"
   actionBody Reject = "throw std::runtime_error(\"Reject\");"
   actionBody (Shift st) = "\
     \stack.push("<> show st <>");\
@@ -184,16 +180,15 @@ writeLRParser name tokens rules t = "\
   actionBody (Reduce ((h, body), code)) = "{"
     <> "if(debug) std::cerr << \"Reduce using "<> h <>" -> "<>showBody body<>"\" << std::endl;"
     <> concat (reverse $ zipWith showArg body [1::Word ..])
-    <> "resultStack.push(([]("<>argDefs<>") {" <> code <> "})("<>args<>"));"
-    <> "stack.push(GOTO[stack.top()]["<>show (nonTermIdx h)<>"/*"<>h<>"*/]);"
+    <> "stack.push({GOTO[top()]["<>show (nonTermIdx h)<>"/*"<>h<>"*/],([]("<>argDefs<>") {" <> code <> "})("<>args<>")});"
     <> "}"
     where
       argDefs = intercalate "," $ zipWith showArgDef body [1::Word ..]
       args = intercalate "," $ zipWith showCallArg body [1::Word ..]
       showArgDef _ i = "const auto &_" <> show i
       showCallArg _ i = "_" <> show i
-      showArg (NonTerm _) i = "auto _"<>show i<>"=std::get<0>(resultStack.top()); resultStack.pop(); stack.pop();"
-      showArg _ i = "auto _"<>show i<>"=std::get<1>(resultStack.top()); resultStack.pop(); stack.pop();"
+      showArg (NonTerm _) i = "auto _"<>show i<>"=std::get<0>(stack.top().second); stack.pop();"
+      showArg _ i = "auto _"<>show i<>"=std::get<1>(stack.top().second); stack.pop();"
   actionsMap = M.fromList actionsMapList
   actionsMapList = zip actions [0::Word ..]
   states = fst t : S.toList (S.fromList $ map snd tl)
