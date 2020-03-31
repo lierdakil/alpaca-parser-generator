@@ -4,12 +4,10 @@ module Lexer (makeLexer, Lang(..)) where
 import qualified Data.Map as M
 import Control.Monad.State
 import qualified Data.IntMap as IM
-import qualified Data.IntSet as IS
 import qualified Data.List.NonEmpty as NE
 import Control.Applicative
 import Data.List
 import Data.Maybe
-import Data.Function
 import Control.Arrow
 import RegexParse
 import RegexLex (alexMonadScan, runAlex, Token(..))

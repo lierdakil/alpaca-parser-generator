@@ -4,7 +4,15 @@
            , ScopedTypeVariables
            , TupleSections
            #-}
-module ParseLR (Proxy(..), LRPoint(..), LR1Point(..), LR0Point(..), makeLRParser, buildLRAutomaton) where
+module ParseLR (Proxy(..)
+  , LRPoint(..)
+  , LR1Point(..)
+  , LR0Point(..)
+  , LRAutomaton
+  , LRState
+  , makeLRParser
+  , writeLRParser
+  , buildLRAutomaton) where
 
 import Grammar
 import qualified Data.Set as S
@@ -13,49 +21,38 @@ import Data.Maybe
 import Data.List
 import Data.Void
 import Data.Char
+import Data.Function
 import Data.Proxy
 import Control.Monad.State
 import Text.Layout.Table
 import qualified Control.Arrow as A
 
-class Ord a => LRPoint a where
+class (Ord a, Ord (Lookahead a)) => LRPoint a where
   type family Lookahead a
-  nextPoint :: Symbol -> a -> Maybe a
-  pointHead :: a -> String
-  pointLeft :: a -> [Symbol]
-  pointRight :: a -> [Symbol]
-  pointAction :: a -> Maybe ((String, [Symbol]), String)
+  lr0 :: a -> LR0Point
+  modLr0 :: a -> LR0Point -> a
+  pointLookahead :: a -> S.Set (Lookahead a)
+  modLookahead :: a -> S.Set (Lookahead a) -> a
   startPoint :: String -> a
-  showLookahead :: a -> String
   makeFirstPoint :: RulesMap -> a -> String -> [Symbol] -> [Symbol] -> Maybe String -> a
   lookaheadMatches :: a -> Symbol -> Bool
+  showLookahead :: a -> String
 
-instance LRPoint LR1Point where
-  type Lookahead LR1Point = Symbol
-  nextPoint s p@LR1Point{lr1PointRight=x:beta}
-    | s == x = Just $ p{lr1PointLeft=x:lr1PointLeft p,lr1PointRight=beta}
-  nextPoint _ _ = Nothing
-  pointHead = lr1PointHead
-  pointLeft = reverse . lr1PointLeft
-  pointRight = lr1PointRight
-  pointAction p | null (pointRight p) = ((pointHead p, pointLeft p), ) <$> lr1PointAction p
-                | otherwise = Nothing
-  startPoint rule = LR1Point Nothing "" [] [NonTerm rule] (S.singleton TermEof)
-  showLookahead LR1Point{lr1PointLookahead=la} = intercalate "/" (map showSymbol $ S.toList la)
-  makeFirstPoint r LR1Point{lr1PointLookahead=la} h b beta act = LR1Point act h [] b $
-      if Nothing `S.member` firstBeta
-      then S.union la (S.map fromJust (S.delete Nothing firstBeta))
-      else S.map fromJust firstBeta
-    where firstBeta = first r beta
-  lookaheadMatches p x = S.member x (lr1PointLookahead p)
-
-data LR1Point = LR1Point {
-    lr1PointAction :: Maybe String
-  , lr1PointHead :: String
-  , lr1PointLeft :: [Symbol]
-  , lr1PointRight :: [Symbol]
-  , lr1PointLookahead :: S.Set Symbol
-  } deriving (Show, Eq, Ord)
+nextPoint :: LRPoint a => Symbol -> a -> Maybe a
+nextPoint s p = modLr0 p <$> nextPoint' (lr0 p)
+  where nextPoint' p'@LR0Point{lr0PointRight=(x:xs), lr0PointLeft=ys}
+          | x == s = Just $ p'{lr0PointRight=xs, lr0PointLeft=x:ys}
+        nextPoint' _ = Nothing
+pointHead :: LRPoint a => a -> String
+pointHead = lr0PointHead . lr0
+pointLeft :: LRPoint a => a -> [Symbol]
+pointLeft = reverse . lr0PointLeft . lr0
+pointRight :: LRPoint a => a -> [Symbol]
+pointRight = lr0PointRight . lr0
+pointAction :: LRPoint a => a -> Maybe ((String, [Symbol]), String)
+pointAction p
+  | null (pointRight p) = ((pointHead p, pointLeft p), ) <$> lr0PointAction (lr0 p)
+  | otherwise = Nothing
 
 data LR0Point = LR0Point {
     lr0PointAction :: Maybe String
@@ -66,18 +63,35 @@ data LR0Point = LR0Point {
 
 instance LRPoint LR0Point where
   type Lookahead LR0Point = Void
-  nextPoint s p@LR0Point{lr0PointRight=x:beta}
-    | s == x = Just $ p{lr0PointLeft=x:lr0PointLeft p,lr0PointRight=beta}
-  nextPoint _ _ = Nothing
-  pointHead = lr0PointHead
-  pointLeft = reverse . lr0PointLeft
-  pointRight = lr0PointRight
-  pointAction p | null (pointRight p) = ((pointHead p, pointLeft p), ) <$> lr0PointAction p
-                | otherwise = Nothing
+  lr0 = id
+  modLr0 _ x = x
+  pointLookahead = const S.empty
+  modLookahead x _ = x
   startPoint rule = LR0Point Nothing "" [] [NonTerm rule]
-  showLookahead _ = ""
-  makeFirstPoint _ _ h b _ act = LR0Point act h [] b
   lookaheadMatches _ _ = True
+  makeFirstPoint _ _ h b _ act = LR0Point act h [] b
+  showLookahead = const ""
+
+data LR1Point = LR1Point {
+    lr1Lr0Point :: LR0Point
+  , lr1PointLookahead :: S.Set Symbol
+  } deriving (Show, Eq, Ord)
+
+instance LRPoint LR1Point where
+  type Lookahead LR1Point = Symbol
+  lr0 = lr1Lr0Point
+  modLr0 p v = p{lr1Lr0Point = v}
+  pointLookahead = lr1PointLookahead
+  modLookahead p v = p{lr1PointLookahead=v}
+  startPoint rule = LR1Point (startPoint rule) (S.singleton TermEof)
+  makeFirstPoint r p@LR1Point{lr1PointLookahead=la} h b beta act
+    = LR1Point (makeFirstPoint r (lr0 p) h b beta act) $
+      if Nothing `S.member` firstBeta
+      then S.union la (S.map fromJust (S.delete Nothing firstBeta))
+      else S.map fromJust firstBeta
+    where firstBeta = first r beta
+  lookaheadMatches p x = S.member x (lr1PointLookahead p)
+  showLookahead = intercalate "/" . map showSymbol . S.toList . pointLookahead
 
 nextSym :: LRPoint a => a -> Maybe Symbol
 nextSym p | (x:_) <- pointRight p = Just x
@@ -87,13 +101,15 @@ type LRState p = S.Set p
 type LRAutomaton p = (LRState p, M.Map (LRState p, Symbol) (LRState p))
 
 makeLRParser :: forall p. LRPoint p => Proxy p -> String -> [Symbol] -> String -> String
-makeLRParser _ name tokens input = writeLRParser name tokens rules . buildLRAutomaton @p $ rules
+makeLRParser _ name tokens input = writeLRParser name tokens r $ buildLRAutomaton @p start r
   where rules = parse input
+        start = let Rule h _ : _ = rules in h
+        r = mkRulesMap (Rule "%S" [([NonTerm start, TermEof], Nothing)] : rules)
 
 data Action p = Accept | Shift Word | Reduce ((String, [Symbol]), String) | Reject deriving (Show, Eq, Ord)
 
-writeLRParser :: LRPoint p => String -> [Symbol] -> Rules -> LRAutomaton p -> String
-writeLRParser name tokens rules t = "\
+writeLRParser :: LRPoint p => String -> [Symbol] -> RulesMap -> LRAutomaton p -> String
+writeLRParser name tokens r t = "\
 \/*\n\
 \" <> printTable r t <> "\
 \\n*/\n\
@@ -134,7 +150,6 @@ writeLRParser name tokens rules t = "\
 \#endif\n\
 \"
   where
-  r = mkRulesMap rules
   make2dTable mkcell rows cols = intercalate "," $ map mkrow rows
     where mkrow row = "{"<>intercalate "," (map (mkcell row) cols)<>"}"
   actionTable = make2dTable mkActionTableCell states tokens
@@ -145,8 +160,12 @@ writeLRParser name tokens rules t = "\
   mkActionTableCell st tok = actionIndex $ case possibleActions st tok of
     [] -> Reject
     [x] -> x
-    xs -> reportConflicts st xs
-  reportConflicts st xs = error $ "Conflicts detected in state " <> stateIndex st <> ":\n"
+    xs -> reportConflicts st tok xs
+  reportConflicts st tok xs = error $ "Conflicts detected in state "
+    <> stateIndex st
+    <> " with token "
+    <> showSymbol tok
+    <> ":\n"
     <> unlines (map showAction xs)
   stateIndex st = show $ fromJust $ M.lookup st statesMap
   showAction (Shift n) = "Shift to state " <> show n
@@ -178,11 +197,17 @@ writeLRParser name tokens rules t = "\
     \a = lex->getNextToken();\
   \"
   actionBody (Reduce ((h, body), code)) = "{"
-    <> "if(debug) std::cerr << \"Reduce using "<> h <>" -> "<>showBody body<>"\" << std::endl;"
+    <> "if(debug) std::cerr << \"Reduce using "<> h <>" -> "<>showBody body<>";\\n\";"
     <> concat (reverse $ zipWith showArg body [1::Word ..])
-    <> "stack.push({GOTO[top()]["<>show (nonTermIdx h)<>"/*"<>h<>"*/],([]("<>argDefs<>") {" <> code <> "})("<>args<>")});"
+    <> "auto gt = " <> goto <> ";"
+    <> "if(gt==0) throw std::runtime_error(\"No goto\");"
+    <> "if(debug) std::cerr << top() << \" is now on top of the stack;\\n\""
+    <> "<< gt <<\" will be placed on the stack\" << std::endl;"
+    <> "stack.push({gt,"<>result<>"});"
     <> "}"
     where
+      result = "([]("<>argDefs<>") {" <> code <> "})("<>args<>")"
+      goto = "GOTO[top()]["<>show (nonTermIdx h)<>"/*"<>h<>"*/]"
       argDefs = intercalate "," $ zipWith showArgDef body [1::Word ..]
       args = intercalate "," $ zipWith showCallArg body [1::Word ..]
       showArgDef _ i = "const auto &_" <> show i
@@ -205,11 +230,9 @@ writeLRParser name tokens rules t = "\
   actions = Reject : map (Shift . snd) (tail statesMapList)
     <> (Accept : map Reduce allReductions)
 
-buildLRAutomaton :: forall p. LRPoint p => Rules -> LRAutomaton p
-buildLRAutomaton rules = (,) startState . fst . flip execState (M.empty, S.empty) $ buildGotoTable startState
+buildLRAutomaton :: forall p. LRPoint p => String -> RulesMap -> LRAutomaton p
+buildLRAutomaton oldStartRule r = (,) startState . fst . flip execState (M.empty, S.empty) $ buildGotoTable startState
   where
-  r = mkRulesMap rules
-  oldStartRule = let (Rule h _) = head rules in h
   startState = S.singleton $ startPoint oldStartRule
   -- buildGotoTable :: LR1State -> m ()
   buildGotoTable i = do
@@ -231,7 +254,9 @@ printTable r t = --show t
   stateMapList = zip states [0::Word ..]
   stateMap = M.fromList stateMapList
   stateRows = map (\(s, n) -> colsAllG top [[show n], showState s]) stateMapList
-  showState = map showPoint . S.toList . pointClosure r
+  showState st = map showPoint (S.toList st) <> ("---" : map showPoint (S.toList new))
+    where cls = pointClosure r st
+          new = cls S.\\ st
   showPoint p
     = unwords (pointHead p : "->" : map showSymbol (pointLeft p) <> ["."] <> map showSymbol (pointRight p)) <> ","
       <> showLookahead p
@@ -246,16 +271,18 @@ printTable r t = --show t
     | otherwise = ""
 
 pointClosure :: LRPoint a => RulesMap -> S.Set a -> S.Set a
-pointClosure r = flip evalState S.empty . fmap S.unions . mapM doAdd . S.toList
+pointClosure r = unify . flip evalState S.empty . fmap S.unions . mapM doAdd . S.toList
   where
-  doAdd p
-    | (NonTerm nt:beta) <- pointRight p = do
-    seen <- gets (S.member nt)
+  unify = S.fromList . map combine . groupBy ((==) `on` lr0) . sortBy (compare `on` lr0) . S.toList
+  combine xs@(x:_) = modLookahead x (S.unions $ map pointLookahead xs)
+  combine [] = error "x-X"
+  doAdd p | (NonTerm nt:beta) <- pointRight p = do
+    seen <- gets (S.member p)
     if not seen
     then do
-      modify (S.insert nt)
+      modify (S.insert p)
       let Just alts = M.lookup nt r
           new = map (\(b, act) -> makeFirstPoint r p nt b beta act) alts
       S.union (S.fromList (p : new)) . S.unions <$> mapM doAdd new
-    else return (S.singleton p)
+    else return S.empty
   doAdd x = return (S.singleton x)

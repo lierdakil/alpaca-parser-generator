@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 module Grammar (
     Symbol(..)
   , Rule(..)
@@ -17,6 +18,7 @@ import GrammarParse
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Maybe
+import Control.Monad.State
 
 type Alt = ([Symbol], Maybe String)
 type RulesMap = M.Map String [Alt]
@@ -60,23 +62,27 @@ first r = first'
   first' [] = S.singleton Nothing
 
 follow :: RulesMap -> Symbol -> S.Set Symbol
-follow r t@(NonTerm _) = follow' S.empty t
+follow r t@(NonTerm _) = evalState (follow' t) S.empty
   where
   rules = M.toList r
-  follow' seen x
-    | x `elem` seen = S.empty
-    | otherwise = S.unions $ map (uncurry oneRule) rules
+  follow' x = do
+    seen <- gets (S.member x)
+    if not seen
+    then do
+      modify (S.insert x)
+      S.unions <$> mapM (uncurry oneRule) rules
+    else return S.empty
     where
-    oneRule h = S.unions . map (oneAlt h . fst)
+    oneRule h = fmap S.unions . mapM (oneAlt h . fst)
     oneAlt h b
       | _:beta <- dropWhile (/=x) b = go beta
-      | otherwise = S.empty
+      | otherwise = return S.empty
       where
       go beta
         | Nothing `S.member` firstBeta
-        = noEpsilon (S.delete Nothing firstBeta)
-          `S.union` follow' (S.insert x seen) (NonTerm h)
+        = S.union <$> noEpsilon (S.delete Nothing firstBeta)
+                  <*> follow' (NonTerm h)
         | otherwise = noEpsilon firstBeta
         where firstBeta = first r beta
-              noEpsilon f = S.mapMonotonic fromJust f `S.union` oneAlt h beta
+              noEpsilon f = (S.mapMonotonic fromJust f `S.union`) <$> oneAlt h beta
 follow _ _ = S.empty
