@@ -35,7 +35,6 @@ buildLLParser tokens rules = "\
   \return names[static_cast<std::size_t>(nt)];\
   \}\
   \Lexer *lex;\
-  \Token curTok;\
   \bool debug;\
   \std::stack<Symbol> stack;\
   \std::stack<std::variant<ResultType,Token>> resultStack;\

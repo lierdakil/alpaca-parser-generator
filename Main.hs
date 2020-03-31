@@ -16,5 +16,5 @@ main = do
   writeFile "lexer.h" lexer
   writeFile "parser.h" $ makeParser $ unlines grammar
   writeFile "parserLL.h" $ makeLLParser tokens $ unlines grammar
-  putStrLn $ makeLRParser (Proxy :: Proxy LR1Point) tokens $ unlines grammar
-  putStrLn $ makeLRParser (Proxy :: Proxy LR0Point) tokens $ unlines grammar
+  -- writeFile "parserLR0.h" $ makeLRParser (Proxy :: Proxy LR0Point) "ParserLR0" tokens $ unlines grammar
+  writeFile "parserLR1.h" $ makeLRParser (Proxy :: Proxy LR1Point) "ParserLR1" tokens $ unlines grammar
