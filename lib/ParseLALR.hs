@@ -1,4 +1,10 @@
-{-# LANGUAGE TypeFamilies, TypeApplications, RecordWildCards, TupleSections #-}
+{-# LANGUAGE TypeFamilies
+           , TypeApplications
+           , RecordWildCards
+           , TupleSections
+           , GeneralizedNewtypeDeriving
+           , UndecidableInstances
+           #-}
 module ParseLALR (makeLALRParser) where
 
 import Grammar
@@ -30,38 +36,18 @@ lalrify t = (lookup' (fst t), M.fromListWith checkSame . map conv $ tl)
     mkLalr xs = (S.map lr0 (head xs), combined $ map S.toList xs)
       where combined :: [[LR1Point]] -> S.Set LALRPoint
             combined = S.fromList . map combine . transpose
-            combine ps@(p1:_) = LALRPoint{
-                lalr0Point = lr0 p1
-              , lalrLookahead = S.unions (map lr1PointLookahead ps)
+            combine ps@(p1:_) = LALRPoint $ LR1Point {
+                lr1Lr0Point = lr0 p1
+              , lr1PointLookahead = S.unions (map lr1PointLookahead ps)
             }
             combine [] = error "x_X"
     tl = M.toList (snd t)
     lr0s = S.map lr0
 
 checkSame :: LRState LALRPoint -> LRState LALRPoint -> LRState LALRPoint
-checkSame a b = if a==b
-  then S.fromList $ zipWith combine (S.toList a) (S.toList b)
-  else error "not same"
-  where
-    combine p1 p2 = p2{lalrLookahead = lalrLookahead p1 `S.union` lalrLookahead p2}
+checkSame a b = if a==b then a
+                else error "not same"
 
-data LALRPoint = LALRPoint {
-    lalr0Point :: LR0Point
-  , lalrLookahead :: S.Set Symbol
-  } deriving (Show,Eq,Ord)
-
-instance LRPoint LALRPoint where
-  type Lookahead LALRPoint = Symbol
-  lr0 = lalr0Point
-  modLr0 p v = p{lalr0Point = v}
-  pointLookahead = lalrLookahead
-  modLookahead p v = p{lalrLookahead=v}
-  startPoint rule = LALRPoint (startPoint rule) $ S.singleton TermEof
-  showLookahead p = intercalate "/" $ map showSymbol (S.toList $ lalrLookahead p)
-  makeFirstPoint r LALRPoint{lalr0Point=p, lalrLookahead=la} h b beta act
-    = LALRPoint (makeFirstPoint r p h b beta act) $
-      if Nothing `S.member` firstBeta
-      then S.union la (S.map fromJust (S.delete Nothing firstBeta))
-      else S.map fromJust firstBeta
-    where firstBeta = first r beta
-  lookaheadMatches p x = S.member x (lalrLookahead p)
+newtype LALRPoint = LALRPoint {
+    lr1Point :: LR1Point
+  } deriving (Show,Eq,Ord,LRPoint)
