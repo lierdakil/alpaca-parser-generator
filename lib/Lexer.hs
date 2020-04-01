@@ -6,7 +6,6 @@ import Control.Monad.State
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import qualified Data.List.NonEmpty as NE
-import Control.Applicative
 import Data.List
 import Data.Maybe
 import Control.Arrow
@@ -46,29 +45,31 @@ regex1ToNFASt (PPositive pat) = do
   patNfa <- regexToNFASt pat
   endSt <- get
   return $ IM.insertWith mapUnion endSt (nonAcc $ M.singleton Nothing [startSt]) patNfa
-regex1ToNFASt (PAlternative pats) = altNFA $ map regexToNFASt pats
+regex1ToNFASt (PAlternative pats) = altNFA True $ map regexToNFASt pats
 
-altNFA :: [State Int NFA] -> State Int NFA
-altNFA mnfas = do
+altNFA :: Bool -> [State Int NFA] -> State Int NFA
+altNFA mkEndNode mnfas = do
   startSt <- get
   nfas <- forM mnfas $ \mnfa -> do
     start <- newState
     nfa <- mnfa
     end <- get
     return ((start, end), nfa)
-  endSt <- newState
+  endSt <- if mkEndNode then Just <$> newState else return Nothing
   let starts = map (fst . fst) nfas
       ends = map (snd . fst) nfas
       nfas' = map snd nfas
-      endsmap = IM.fromList $ map (, nonAcc $ M.singleton Nothing [endSt]) ends
+      endsmap = case endSt of
+        Just x -> (IM.fromList (map (, nonAcc $ M.singleton Nothing [x]) ends) :)
+        Nothing -> id
   return $ IM.insertWith mapUnion startSt (nonAcc $ M.singleton Nothing starts)
-         $ IM.unionsWith mapUnion (endsmap:nfas')
+         $ IM.unionsWith mapUnion (endsmap nfas')
 
 mapUnion :: Ord k =>
             (StateAttr, M.Map k [a2])
             -> (StateAttr, M.Map k [a2])
             -> (StateAttr, M.Map k [a2])
-mapUnion (a, x) (b, y) = (a <|> b, M.unionWith (++) x y)
+mapUnion (a, x) (b, y) = (a <> b, M.unionWith (++) x y)
 
 regexToNFASt :: RegexPattern -> State Int NFA
 regexToNFASt = foldr
@@ -87,10 +88,10 @@ build1NFA (RegexDef mbname pat mbact) = regexToNFA (mbname, mbact) pat
 
 buildNFA :: [RegexDef] -> State Int NFA
 buildNFA [x] = build1NFA x
-buildNFA xs = altNFA $ map build1NFA xs
+buildNFA xs = altNFA False $ map build1NFA xs
 
-scanLine :: String -> [Token]
-scanLine s = either error id $ runAlex s go
+scanLine :: String -> Either String [Token]
+scanLine s = runAlex s go
   where
   go = do
     tok <- alexMonadScan
@@ -98,26 +99,42 @@ scanLine s = either error id $ runAlex s go
                 then go
                 else return []
 
-buildDFA :: [RegexDef] -> DFA
-buildDFA defs = simplifyDFA . nfaToDFA $ evalState (buildNFA defs) 0
-
 data Lang = CPP
 
-makeLexer :: [String] -> Lang -> ([Symbol], String)
-makeLexer = writeLexer . buildDFA . map (regex . scanLine)
+makeLexer :: [String] -> Lang -> Either String ([Symbol], [(FilePath, String)])
+makeLexer input lang = do
+  defs <- mapM (fmap regex . scanLine) input
+  let nfa = evalState (buildNFA defs) 0
+      dfa = simplifyDFA . nfaToDFA $ nfa
+      debug = [("nfa.gv", nfaToGraphviz nfa), ("dfa.gv", dfaToGraphviz dfa)]
+  (tokens, code) <- writeLexer dfa lang
+  return (tokens, debug <> code)
 
-writeLexer :: DFA -> Lang -> ([Symbol], String)
-writeLexer dfa CPP = (,) terminals $ "\
+writeLexer :: DFA -> Lang -> Either String ([Symbol], [(FilePath, String)])
+writeLexer dfa CPP = do
+  accSt <- catMaybes <$> mapM (\(f, (s, _)) -> fmap (f,) <$> isSingle f s) stList
+  let accStS = IS.fromList $ map fst accSt
+      checkAccepting st
+        | st `IS.member` accStS
+        = "lastAccChIx = curChIx; accSt = "<>show st <>";"
+        | otherwise = ""
+      tokNames = nub $ mapMaybe (fst . snd) accSt
+      returnResult = concat (foldr ((:) . returnResult1) [] accSt)
+      terminals = TermEof : map Term tokNames
+      tokReflect = intercalate "," . map (\x -> '"':x <> "\"") $ "%eof":tokNames
+      checkState (curSt, (_, charTrans)) = "state_" <> show curSt <> ":"
+        <> checkAccepting curSt
+        <> "if(curChIx == endIx) goto end;"
+        <> "curCh = *curChIx; ++curChIx;"
+        <> intercalate " else " (foldr ((:) . checkChars) [] charTrans)
+        <> "goto end;"
+      transTable = concatMap checkState stList
+  return $ (,) terminals [("lexer.h", "\
 \#ifndef LEXER_H\n\
 \#define LEXER_H\n\
 \#include <string>\n\
-\#include <stdexcept>\n\
-\#include <iostream>\n\
 \enum class TokenType : std::size_t { eof, " <> intercalate "," (map ("Tok_"<>) tokNames) <> "};\
-\std::string to_string(TokenType tt) { \
-\static constexpr const char *names[] = {" <> tokReflect <> " };\
-\return names[static_cast<std::size_t>(tt)];\
-\}\
+\const char* to_string(TokenType tt);\
 \\n\
 \#if __has_include(\"token.h\")\n\
 \#include \"token.h\"\n\
@@ -134,34 +151,42 @@ writeLexer dfa CPP = (,) terminals $ "\
   \std::string::const_iterator endIx;\
   \const bool debug;\
 \public:\
-  \Lexer(const std::string &input, bool debug=false) \
-  \: _input(input), input(_input), curChIx(input.cbegin()), endIx(input.cend()), debug(debug) {}\
-  \Token getNextToken() {\
-    \start:\
-    \auto lastAccChIx = curChIx;\
-    \auto startChIx = curChIx;\
-    \char curCh;\
-    \int accSt = -1;\
-    \"<> transTable <> "\
-    \end:\
-    \auto lastReadChIx = curChIx;\
-    \curChIx = lastAccChIx;\
-    \std::string_view text(&*startChIx, std::distance(startChIx, curChIx));\
-    \switch(accSt){\
-    \" <> returnResult <> "\
-    \}\
-    \if (curChIx == endIx) { \
-    \if (debug) std::cerr << \"Got EOF while lexing \\\"\" << text << \"\\\"\" << std::endl; \
-    \return mkToken(TokenType::eof); }\
-    \throw std::runtime_error(\"Unexpected input: \" + std::string(startChIx, lastReadChIx));\
-  \}\
+  \Lexer(const std::string &input, bool debug=false);\
+  \Token getNextToken();\
 \};\n\
-\#endif\n"
+\#endif\n")
+    , ("lexer.cpp", "\
+\#include \"lexer.h\"\n\
+\#include <stdexcept>\n\
+\#include <iostream>\n\
+\const char* to_string(TokenType tt){\
+\static constexpr const char *names[] = {" <> tokReflect <> " };\
+\return names[static_cast<std::size_t>(tt)];\
+\}\
+\Lexer::Lexer(const std::string &input, bool debug=false) \
+\: _input(input), input(_input), curChIx(input.cbegin()), endIx(input.cend()), debug(debug) {}\
+\Token Lexer::getNextToken() {\
+  \start:\
+  \auto lastAccChIx = curChIx;\
+  \auto startChIx = curChIx;\
+  \char curCh;\
+  \int accSt = -1;\
+  \"<> transTable <> "\
+  \end:\
+  \auto lastReadChIx = curChIx;\
+  \curChIx = lastAccChIx;\
+  \std::string_view text(&*startChIx, std::distance(startChIx, curChIx));\
+  \switch(accSt){\
+  \" <> returnResult <> "\
+  \}\
+  \if (curChIx == endIx) { \
+  \if (debug) std::cerr << \"Got EOF while lexing \\\"\" << text << \"\\\"\" << std::endl; \
+  \return mkToken(TokenType::eof); }\
+  \throw std::runtime_error(\"Unexpected input: \" + std::string(startChIx, lastReadChIx));\
+\}\
+\")
+    ]
   where
-  terminals = TermEof : map Term tokNames
-  tokReflect = intercalate "," . map (\x -> '"':x <> "\"") $ "%eof":tokNames
-  tokNames = nub $ mapMaybe (fst . snd) accSt
-  returnResult = concat (foldr ((:) . returnResult1) [] accSt)
   returnResult1 (st, (Just name, act))
     = "case "<> show st <>":\
       \if (debug) std::cerr << \"Lexed token " <> name <> ": \\\"\" << text << \"\\\"\" << std::endl; \
@@ -172,22 +197,9 @@ writeLexer dfa CPP = (,) terminals $ "\
       \goto start;"
   mkAct NoAction = ""
   mkAct (Action act) = "," <> act
-  accSt = mapMaybe (\(f, (s, _)) -> (f,) <$> isSingle f s) stList
-  isSingle _ [] = Nothing
-  isSingle _ [x] = Just x
-  isSingle f xs = error $ "Lexer: Multiple actions/tokens match the same state " <> show f <> ": " <> show xs
-  accStS = IS.fromList $ map fst accSt
-  transTable = concatMap checkState stList
-  checkState (curSt, (_, charTrans)) = "state_" <> show curSt <> ":"
-    <> checkAccepting curSt
-    <> "if(curChIx == endIx) goto end;"
-    <> "curCh = *curChIx; ++curChIx;"
-    <> intercalate " else " (foldr ((:) . checkChars) [] charTrans)
-    <> "goto end;"
-  checkAccepting st
-    | st `IS.member` accStS
-    = "lastAccChIx = curChIx; accSt = "<>show st <>";"
-    | otherwise = ""
+  isSingle _ [] = return Nothing
+  isSingle _ [x] = return $ Just x
+  isSingle f xs = fail $ "Lexer: Multiple actions/tokens match the same state " <> show f <> ": " <> show xs
   checkChars (charGroup, newSt) = "if(" <> charCond charGroup <> ") goto state_" <> show newSt <> ";"
   charCond = intercalate "||" . map charCond1 . NE.toList
   charCond1 (CChar c) = "curCh == " <> show c

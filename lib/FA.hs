@@ -5,9 +5,11 @@ module FA (
   , DFA
   , nfaToDFA
   , simplifyDFA
+  , nfaToGraphviz
+  , dfaToGraphviz
   ) where
 
-import RegexParse (Action, CharPattern)
+import RegexParse (Action, CharPattern(..))
 import qualified Data.Map as M
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
@@ -22,6 +24,31 @@ import Data.Function
 type StateAttr = [(Maybe String, Action)]
 type NFA = IM.IntMap (StateAttr, M.Map (Maybe (NE.NonEmpty CharPattern)) [Int])
 type DFA = IM.IntMap (StateAttr, M.Map (NE.NonEmpty CharPattern) Int)
+
+nfaToGraphviz :: NFA -> String
+nfaToGraphviz fa = "digraph{rankdir=LR;" <> concatMap node l <> "}"
+  where l = IM.toList fa
+        node (i, (a, t)) = show i <> "[label=\""<> intercalate "/" lbl <>"\"" <> acc <> "];"
+                                  <> concatMap (trans i) (M.toList t)
+                           where lbl = mapMaybe fst a
+                                 acc = if not $ null lbl then ", peripheries=2" else ""
+        trans i (c, ss) = concatMap (\s -> show i <> " -> " <> show s <> "[label=\""<> showCharPattern c<>"\"];") ss
+
+dfaToGraphviz :: DFA -> String
+dfaToGraphviz fa = "digraph{rankdir=LR;" <> concatMap node l <> "}"
+  where l = IM.toList fa
+        node (i, (a, t)) = show i <> "[label=\""<> intercalate "/" lbl <>"\"" <> acc <> "];"
+                                  <> concatMap (trans i) (M.toList t)
+                           where lbl = mapMaybe fst a
+                                 acc = if not $ null lbl then ", peripheries=2" else ""
+        trans i (c, ss) = (\s -> show i <> " -> " <> show s <> "[label=\""<> showCharPattern (Just c)<>"\"];") ss
+
+showCharPattern :: Maybe (NE.NonEmpty CharPattern) -> String
+showCharPattern Nothing = "ε"
+showCharPattern (Just (x NE.:| rest)) = concatMap show1 $ x : rest
+  where show1 (CChar c) = ['\'', c, '\'']
+        show1 (CRange a b) = ['[',a,'-',b,']']
+        show1 CAny = "'.'"
 
 nfaToDFASt :: NFA -> State (Int, IS.IntSet, [(Int, (StateAttr, IS.IntSet))]) DFA
 nfaToDFASt nfa = do
@@ -40,14 +67,16 @@ nfaToDFASt nfa = do
               modify (\(_, x, y) -> (st', x, (st', (uacc, u)):y))
               return $ M.singleton ch st'
         nm <- nfaToDFASt nfa
-        return $ IM.union nm (IM.singleton t (tacc, M.unions cm))
+        return $ IM.unionWith u0 nm (IM.singleton t (tacc, M.unions cm))
     _ -> return IM.empty
   where
-  moves = concatMap moves1 . IS.toList
+  u0 (a1, m1) (a2, m2) = (a1 <> a2, M.unionWith u1 m1 m2)
+  u1 a b = if a == b then a else error "Multiple-state transition in DFA"
+  moves = M.toList . M.unionsWith (<>) . map moves1 . IS.toList
   moves1 st
     | Just (_, trans) <- IM.lookup st nfa
-    = mapMaybe (\(ch, sts) -> (,sts) <$> ch) $ M.toList trans
-    | otherwise = []
+    = M.mapKeysMonotonic fromJust . M.delete Nothing $ trans
+    | otherwise = M.empty
 
 ecls :: Ord a =>
           IM.IntMap (StateAttr, M.Map (Maybe a) [IS.Key])

@@ -6,3 +6,5 @@
 /dist-newstyle
 /a.out
 .ccls
+*.gv
+*.png
