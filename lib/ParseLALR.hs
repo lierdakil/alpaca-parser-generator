@@ -1,7 +1,5 @@
 {-# LANGUAGE TypeFamilies
            , TypeApplications
-           , RecordWildCards
-           , TupleSections
            , GeneralizedNewtypeDeriving
            , UndecidableInstances
            #-}
@@ -36,9 +34,8 @@ lalrify t = (lookup' (fst t), M.fromListWith checkSame . map conv $ tl)
     mkLalr xs = (S.map lr0 (head xs), combined $ map S.toList xs)
       where combined :: [[LR1Point]] -> S.Set LALRPoint
             combined = S.fromList . map combine . transpose
-            combine ps@(p1:_) = LALRPoint $ LR1Point {
-                lr1Lr0Point = lr0 p1
-              , lr1PointLookahead = S.unions (map lr1PointLookahead ps)
+            combine ps@(p1:_) = LALRPoint $ p1{
+              lr1PointLookahead = S.unions (map lr1PointLookahead ps)
             }
             combine [] = error "x_X"
     tl = M.toList (snd t)
