@@ -19,7 +19,7 @@ import Control.Applicative
 import Control.Arrow
 import Data.Function
 
-type StateAttr = Maybe (Maybe String, Action)
+type StateAttr = [(Maybe String, Action)]
 type NFA = IM.IntMap (StateAttr, M.Map (Maybe (NE.NonEmpty CharPattern)) [Int])
 type DFA = IM.IntMap (StateAttr, M.Map (NE.NonEmpty CharPattern) Int)
 
@@ -58,7 +58,7 @@ ecls nfa st = (accs, IS.fromList stl)
   stl = snd $ ecls' st
   -- ecls' :: [Int] -> (Bool, [Int])
   ecls' arg = let res = map ecls1 arg
-                  acc = foldl' (<|>) Nothing $ map fst res
+                  acc = concatMap fst res
                   sts = concatMap snd res
               in (acc, sts)
   -- ecls1 :: Int -> (Bool, [Int])
@@ -67,7 +67,7 @@ ecls nfa st = (accs, IS.fromList stl)
     = let newst = concat . maybeToList $ M.lookup Nothing trans
           (restacc, rest) = ecls' newst
       in (acc <|> restacc, st2:newst <> rest)
-    | otherwise = (Nothing, [])
+    | otherwise = ([], [])
 
 simplifyDFA :: DFA -> DFA
 simplifyDFA dfa = IM.fromList $ mapMaybe simpDFA lst

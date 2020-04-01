@@ -20,7 +20,7 @@ newState = state $ \s -> (s+1, s+1)
 
 nonAcc :: M.Map (Maybe (NE.NonEmpty CharPattern)) [Int]
        -> (StateAttr, M.Map (Maybe (NE.NonEmpty CharPattern)) [Int])
-nonAcc = (,) Nothing
+nonAcc = (,) []
 
 regex1ToNFASt :: RegexPatternSingle -> State Int NFA
 regex1ToNFASt (PGroup ch) = do
@@ -79,7 +79,7 @@ regexToNFA :: (Maybe String, Action) -> RegexPattern -> State Int NFA
 regexToNFA (name, action) pat = do
   res1 <- regexToNFASt pat
   lastSt <- get
-  return $ IM.insertWith mapUnion lastSt (Just (name, action), M.empty) res1
+  return $ IM.insertWith mapUnion lastSt ([(name, action)], M.empty) res1
 
 build1NFA :: RegexDef -> State Int NFA
 build1NFA (RegexDef mbname pat mbact) = regexToNFA (mbname, mbact) pat
@@ -172,7 +172,10 @@ writeLexer dfa CPP = (,) terminals $ "\
       \goto start;"
   mkAct NoAction = ""
   mkAct (Action act) = "," <> act
-  accSt = mapMaybe (\(f, (s, _)) -> (f,) <$> s) stList
+  accSt = mapMaybe (\(f, (s, _)) -> (f,) <$> isSingle f s) stList
+  isSingle _ [] = Nothing
+  isSingle _ [x] = Just x
+  isSingle f xs = error $ "Lexer: Multiple actions/tokens match the same state " <> show f <> ": " <> show xs
   accStS = IS.fromList $ map fst accSt
   transTable = concatMap checkState stList
   checkState (curSt, (_, charTrans)) = "state_" <> show curSt <> ":"
