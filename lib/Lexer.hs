@@ -4,6 +4,7 @@ module Lexer (makeLexer, Lang(..)) where
 import qualified Data.Map as M
 import Control.Monad.State
 import qualified Data.IntMap as IM
+import qualified Data.IntSet as IS
 import qualified Data.List.NonEmpty as NE
 import Control.Applicative
 import Data.List
@@ -122,69 +123,69 @@ writeLexer dfa CPP = (,) terminals $ "\
 \#include \"token.h\"\n\
 \#else\n\
 \struct Token{TokenType type; std::string text;};\
-\Token mkToken(TokenType type, const std::string& text = \"\") {\
-  \return Token{type, text};\
+\Token mkToken(TokenType type, const std::string_view &text = \"\") {\
+  \return Token{type, std::string(text)};\
 \}\n\
 \#endif\n\
 \class Lexer {\
-  \std::string input;\
-  \std::size_t curChIx;\
-  \bool debug;\
+  \const std::string _input;\
+  \const std::string_view input;\
+  \std::string::const_iterator curChIx;\
+  \std::string::const_iterator endIx;\
+  \const bool debug;\
 \public:\
   \Lexer(const std::string &input, bool debug=false) \
-  \: input(input), curChIx(0), debug(debug) {}\
+  \: _input(input), input(_input), curChIx(input.cbegin()), endIx(input.cend()), debug(debug) {}\
   \Token getNextToken() {\
-    \std::string buf;\
-    \std::string text;\
-    \std::size_t lastAccChIx = curChIx;\
-    \int curSt = 0;\
+    \start:\
+    \auto lastAccChIx = curChIx;\
+    \auto startChIx = curChIx;\
+    \char curCh;\
     \int accSt = -1;\
-    \while (curSt != -1) {\
-      \" <> checkAccState <> "\
-      \if (curChIx >= input.size())\
-        \break;\
-      \char curCh = input[curChIx];\
-      \curChIx += 1;\
-      \curSt = transTable(curCh, curSt);\
-      \buf += curCh;\
-    \}\
+    \"<> transTable <> "\
+    \end:\
+    \auto lastReadChIx = curChIx;\
     \curChIx = lastAccChIx;\
+    \std::string_view text(&*startChIx, std::distance(startChIx, curChIx));\
+    \switch(accSt){\
     \" <> returnResult <> "\
-    \if (curChIx >= input.size()) { \
+    \}\
+    \if (curChIx == endIx) { \
     \if (debug) std::cerr << \"Got EOF while lexing \\\"\" << text << \"\\\"\" << std::endl; \
     \return mkToken(TokenType::eof); }\
-    \throw std::runtime_error(\"Unexpected input: \" + buf);\
+    \throw std::runtime_error(\"Unexpected input: \" + std::string(startChIx, lastReadChIx));\
   \}\
-  \int transTable(char curCh, int curSt) { " <> transTable <> " return -1; } \
 \};\n\
 \#endif\n"
   where
   terminals = TermEof : map Term tokNames
   tokReflect = intercalate "," . map (\x -> '"':x <> "\"") $ "%eof":tokNames
-  -- tokReflect1 tn = "case TokenType::Tok_" <> tn <> ": return \"" <> tn <> "\";"
   tokNames = nub $ mapMaybe (fst . snd) accSt
   returnResult = concat (foldr ((:) . returnResult1) [] accSt)
   returnResult1 (st, (Just name, act))
-    = "if (accSt == "<> show st <>") { \
+    = "case "<> show st <>":\
       \if (debug) std::cerr << \"Lexed token " <> name <> ": \\\"\" << text << \"\\\"\" << std::endl; \
-      \return mkToken(TokenType::Tok_" <> name <> mkAct act <>"); }"
+      \return mkToken(TokenType::Tok_" <> name <> mkAct act <>");"
   returnResult1 (st, (Nothing, _))
-    = "if (accSt == "<> show st <>") { \
+    = "case "<> show st <>":\
       \if (debug) std::cerr << \"Skipping state " <> show st <> ": \\\"\" << text << \"\\\"\" << std::endl; \
-      \return getNextToken(); }"
+      \goto start;"
   mkAct NoAction = ""
   mkAct (Action act) = "," <> act
-  checkAccState = "if( "
-     <> intercalate " || " (foldr ((:) . checkAccState1 . fst) [] accSt)
-     <> ") { lastAccChIx = curChIx; text = buf; accSt = curSt; }"
-  checkAccState1 st = "curSt == " <> show st
   accSt = mapMaybe (\(f, (s, _)) -> (f,) <$> s) stList
-  transTable = "switch(curSt) { " <> concat (foldr ((:) . checkState) [] stList) <> " } "
-  checkState (_, (_, [])) = ""
-  checkState (curSt, (_, charTrans)) = "case " <> show curSt <> ":"
+  accStS = IS.fromList $ map fst accSt
+  transTable = concatMap checkState stList
+  checkState (curSt, (_, charTrans)) = "state_" <> show curSt <> ":"
+    <> checkAccepting curSt
+    <> "if(curChIx == endIx) goto end;"
+    <> "curCh = *curChIx; ++curChIx;"
     <> intercalate " else " (foldr ((:) . checkChars) [] charTrans)
-    <> "break;"
-  checkChars (charGroup, newSt) = "if(" <> charCond charGroup <> ") return " <> show newSt <> ";"
+    <> "goto end;"
+  checkAccepting st
+    | st `IS.member` accStS
+    = "lastAccChIx = curChIx; accSt = "<>show st <>";"
+    | otherwise = ""
+  checkChars (charGroup, newSt) = "if(" <> charCond charGroup <> ") goto state_" <> show newSt <> ";"
   charCond = intercalate "||" . map charCond1 . NE.toList
   charCond1 (CChar c) = "curCh == " <> show c
   charCond1 (CRange c1 c2) = "(curCh >= " <> show c1 <> " && curCh <= " <> show c2 <> ")"
