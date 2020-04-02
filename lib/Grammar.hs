@@ -18,12 +18,13 @@ import GrammarParse
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Maybe
+import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 import Control.Monad.State
 
 type Alt = ([Symbol], Maybe String)
-type RulesMap = M.Map String (NE.NonEmpty Alt)
-type Rules = NE.NonEmpty Rule
+type RulesMap = M.Map String (NonEmpty Alt)
+type Rules = NonEmpty Rule
 
 parse :: String -> Rules
 parse = grammar . scan

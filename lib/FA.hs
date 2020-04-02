@@ -22,8 +22,8 @@ import Control.Monad.State
 import Control.Arrow
 
 type StateAttr = S.Set (Maybe String, Action)
-type NFA = IM.IntMap (StateAttr, M.Map (Maybe (NE.NonEmpty CharPattern)) [Int])
-type DFA = IM.IntMap (StateAttr, M.Map (NE.NonEmpty CharPattern) Int)
+type NFA = IM.IntMap (StateAttr, M.Map (Maybe (NonEmpty CharPattern)) [Int])
+type DFA = IM.IntMap (StateAttr, M.Map (NonEmpty CharPattern) Int)
 
 nfaToGraphviz :: NFA -> String
 nfaToGraphviz fa = "digraph{rankdir=LR;" <> concatMap node l <> "}"
@@ -43,9 +43,9 @@ dfaToGraphviz fa = "digraph{rankdir=LR;" <> concatMap node l <> "}"
                                  acc = if not $ null lbl then ", peripheries=2" else ""
         trans i (c, ss) = (\s -> show i <> " -> " <> show s <> "[label=\""<> showCharPattern (Just c)<>"\"];") ss
 
-showCharPattern :: Maybe (NE.NonEmpty CharPattern) -> String
+showCharPattern :: Maybe (NonEmpty CharPattern) -> String
 showCharPattern Nothing = "ε"
-showCharPattern (Just (x NE.:| rest)) = concatMap show1 $ x : rest
+showCharPattern (Just (x :| rest)) = concatMap show1 $ x : rest
   where show1 (CChar c) = ['\'', c, '\'']
         show1 (CRange a b) = ['[',a,'-',b,']']
         show1 CAny = "'.'"

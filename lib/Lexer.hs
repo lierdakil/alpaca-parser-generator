@@ -6,6 +6,7 @@ import qualified Data.Set as S
 import Control.Monad.State
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
+import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 import Data.List
 import Data.Maybe
@@ -19,8 +20,8 @@ import MonadTypes
 newState :: State Int Int
 newState = state $ \s -> (s+1, s+1)
 
-nonAcc :: M.Map (Maybe (NE.NonEmpty CharPattern)) [Int]
-       -> (StateAttr, M.Map (Maybe (NE.NonEmpty CharPattern)) [Int])
+nonAcc :: M.Map (Maybe (NonEmpty CharPattern)) [Int]
+       -> (StateAttr, M.Map (Maybe (NonEmpty CharPattern)) [Int])
 nonAcc = (,) S.empty
 
 regex1ToNFASt :: RegexPatternSingle -> State Int NFA

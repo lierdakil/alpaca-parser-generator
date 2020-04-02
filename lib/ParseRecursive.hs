@@ -59,7 +59,7 @@ makeRuleParser ars (Rule h a) = do
   where returnType | h `S.member` ars = "ResultType"
                    | otherwise        = "void"
 
-buildAlternatives :: Monad m => ActionableRules -> String -> NE.NonEmpty Alt -> MyMonadT m String
+buildAlternatives :: Monad m => ActionableRules -> String -> NonEmpty Alt -> MyMonadT m String
 buildAlternatives ars h ((x, act) :| []) = return $ printDebug h x <> buildBody ars (zip [1..] x) <> buildAction act
 buildAlternatives ars h xs = (<> err) . intercalate " else " <$> mapM (buildAlt ars h) xs'
   where
