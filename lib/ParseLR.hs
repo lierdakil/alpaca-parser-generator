@@ -2,6 +2,7 @@
            , TypeFamilies
            , TypeApplications
            , ScopedTypeVariables
+           , PatternSynonyms
            #-}
 module ParseLR (Proxy(..)
   , LRPoint(..)
@@ -11,7 +12,9 @@ module ParseLR (Proxy(..)
   , LRState
   , makeLRParser
   , writeLRParser
-  , buildLRAutomaton) where
+  , buildLRAutomaton
+  , pattern ExtendedStartRule
+  ) where
 
 import Grammar
 import qualified Data.Set as S
@@ -62,13 +65,16 @@ data LR0Point = LR0Point {
   , lr0PointRight :: [Symbol]
   } deriving (Show, Eq, Ord)
 
+pattern ExtendedStartRule :: String
+pattern ExtendedStartRule = "%S"
+
 instance LRPoint LR0Point where
   type Lookahead LR0Point = Void
   lr0 = id
   modLr0 _ x = x
   pointLookahead = const S.empty
   modLookahead x _ = x
-  startPoint rule = LR0Point Nothing "" [] [NonTerm rule]
+  startPoint rule = LR0Point Nothing ExtendedStartRule [] [NonTerm rule]
   lookaheadMatches _ _ = True
   makeFirstPoint _ _ h b _ act = LR0Point act h [] b
   showLookahead = const ""
@@ -108,9 +114,9 @@ makeLRParser _ input base name tokens
   = writeLRParser base name tokens r $ buildLRAutomaton @p start r
   where rules = parse input
         start = let Rule h _ :| _ = rules in h
-        r = mkRulesMap (Rule "%S" (([NonTerm start, TermEof], Nothing) :| []) <| rules)
+        r = mkRulesMap (Rule ExtendedStartRule (([NonTerm start, TermEof], Nothing) :| []) <| rules)
 
-data Action p = Accept | Shift Word | Reduce ((String, [Symbol]), Maybe String) | Reject deriving (Show, Eq, Ord)
+data Action p = Shift Word | Reduce ((String, [Symbol]), Maybe String) | Reject deriving (Show, Eq, Ord)
 
 writeLRParser :: forall p m. (LRPoint p, Monad m) => FilePath -> String -> [Symbol] -> RulesMap -> LRAutomaton p -> MyMonadT m [(FilePath,String)]
 writeLRParser base name tokens r t = do
@@ -172,15 +178,15 @@ writeLRParser base name tokens r t = do
   mkActionTableCell st tok = actionIndex <$> case possibleActions st tok of
     [] -> return Reject
     [x] -> return x
-    xs -> reportConflicts st tok xs >> return (head xs)
-  reportConflicts st tok xs = tell $
-    "Conflicts detected in state " <> stateIndex st <> " with token " <> showSymbol tok <> "."
-    : "Choosing the first alternative (usually shift):"
-    : map showAction xs
+    (x:xs) -> reportConflicts st tok (x:|xs) >> return (head xs)
+  reportConflicts st tok (x:|xs) = do
+    tell $
+      "Conflicts detected in state " <> stateIndex st <> " with token " <> showSymbol tok <> "."
+      : map showAction (x:xs)
+    tell ["Will use " <> showAction x]
   stateIndex st = show $ fromJust $ M.lookup st statesMap
   showAction (Shift n) = "Shift to state " <> show n
   showAction (Reduce ((h, b), _)) = "Reduce " <> h <> " -> " <> showBody b
-  showAction Accept = "Accept"
   showAction Reject = "Reject"
   possibleActions st tok = shiftActions st tok <> reduceActions st tok
   shiftActions st tok
@@ -189,23 +195,18 @@ writeLRParser base name tokens r t = do
     = [Shift nst']
     | otherwise = []
   reduceActions st tok
-    | any lastPoint st, tok == TermEof = [Accept]
     | ps <- mapMaybe pointAction . filter (`lookaheadMatches` tok) $ S.toList (pointClosure r st)
     = map Reduce ps
-    where lastPoint p | null (pointRight p)
-                      , null (pointHead p)
-                      = True
-                      | otherwise = False
   writeAction (Shift _, _) = ""
   writeAction (a, n) = "case " <> show n <> ": "
     <> actionBody a
     <> "break;"
-  actionBody Accept = "return std::get<0>(stack.top().second);"
   actionBody Reject = "throw std::runtime_error(\"Reject\");"
   actionBody (Shift st) = "\
     \stack.push("<> show st <>");\
     \a = lex->getNextToken();\
   \"
+  actionBody (Reduce ((ExtendedStartRule, _), _)) = "return std::get<0>(stack.top().second);"
   actionBody (Reduce ((h, body), mcode)) = "{"
     <> "if(debug) std::cerr << \"Reduce using "<> h <>" -> "<>showBody body<>";\\n\";"
     <> concat (reverse $ zipWith showArg body [1::Word ..])
@@ -232,7 +233,9 @@ writeLRParser base name tokens r t = do
   actionsMapList = zip actions [0::Word ..]
   states = fst t : S.toList (S.fromList $ map snd tl)
   tl = M.toList (snd t)
-  nonTermIdx nt = fromJust $ M.lookup nt nonTerminalsMap
+  fromJust' _ (Just x) = x
+  fromJust' m Nothing = error m
+  nonTermIdx nt = fromJust' ("nonTermIdx" <> show nt) $ M.lookup nt nonTerminalsMap
   nonTerminalsMap = M.fromList $ zip nonTerminals [0::Word ..]
   nonTerminals = nub $ mapMaybe (isNonTerm . snd) $ M.keys (snd t)
   isNonTerm (NonTerm x) = Just x
@@ -242,7 +245,7 @@ writeLRParser base name tokens r t = do
   allReductions = nub $ concatMap getReduction states
   getReduction st = mapMaybe pointAction $ S.toList (pointClosure r st)
   actions = Reject : map (Shift . snd) (tail statesMapList)
-    <> (Accept : map Reduce allReductions)
+    <> map Reduce allReductions
 
 buildLRAutomaton :: forall p. LRPoint p => String -> RulesMap -> LRAutomaton p
 buildLRAutomaton oldStartRule r = (,) startState . fst . flip execState (M.empty, S.empty) $ buildGotoTable startState

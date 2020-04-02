@@ -25,7 +25,7 @@ makeLALRParser input base name tokens
     writeLRParser base name tokens r automaton
   where rules = parse input
         start = let Rule h _ :| _ = rules in h
-        r = mkRulesMap (Rule "%S" (([NonTerm start], Nothing) :| []) <| rules)
+        r = mkRulesMap (Rule ExtendedStartRule (([NonTerm start], Nothing) :| []) <| rules)
 
 lalrify :: Monad m => LRAutomaton LR1Point -> MyMonadT m (LRAutomaton LALRPoint)
 lalrify t = (,) (lookup' (fst t)) . M.fromAscList <$> mapM ensureUnique (NE.groupAllWith fst (map conv tl))
