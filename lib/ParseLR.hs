@@ -25,6 +25,7 @@ import Data.Void
 import Data.Char
 import Data.Function
 import Data.Proxy
+import MonadTypes
 import Control.Monad.State
 import Text.Layout.Table
 import qualified Control.Arrow as A
@@ -102,39 +103,55 @@ nextSym p | (x:_) <- pointRight p = Just x
 type LRState p = S.Set p
 type LRAutomaton p = (LRState p, M.Map (LRState p, Symbol) (LRState p))
 
-makeLRParser :: forall p. LRPoint p => Proxy p -> String -> [Symbol] -> String -> String
-makeLRParser _ name tokens input = writeLRParser name tokens r $ buildLRAutomaton @p start r
+makeLRParser :: forall p m. (LRPoint p, Monad m)
+             => Proxy p -> String -> FilePath -> String -> [Symbol]
+             -> MyMonadT m [(FilePath,String)]
+makeLRParser _ input base name tokens
+  = writeLRParser base name tokens r $ buildLRAutomaton @p start r
   where rules = parse input
         start = let Rule h _ : _ = rules in h
         r = mkRulesMap (Rule "%S" (([NonTerm start, TermEof], Nothing) :| []) : rules)
 
 data Action p = Accept | Shift Word | Reduce ((String, [Symbol]), String) | Reject deriving (Show, Eq, Ord)
 
-writeLRParser :: LRPoint p => String -> [Symbol] -> RulesMap -> LRAutomaton p -> String
-writeLRParser name tokens r t = "\
-\/*\n\
-\" <> printTable r t <> "\
-\\n*/\n\
+writeLRParser :: forall p m. (LRPoint p, Monad m) => FilePath -> String -> [Symbol] -> RulesMap -> LRAutomaton p -> MyMonadT m [(FilePath,String)]
+writeLRParser base name tokens r t = do
+  actionTable <- make2dTableM mkActionTableCell states tokens
+  gotoTable <- make2dTableM mkGotoTableCell states nonTerminals
+  return [
+      (base <> ".txt",  printTable r t)
+    , (base <> ".h", "\
 \#ifndef "<> map toUpper name <> "_H\n\
 \#define "<> map toUpper name <> "_H\n\
 \#include \"lexer.h\"\n\
 \#include \"parseResult.h\"\n\
 \#include <stack>\n\
-\#include <stdexcept>\n\
-\#include <string>\n\
 \#include <variant>\n\
 \class "<>name<>" {\
   \Lexer *lex;\
   \bool debug;\
   \std::stack<std::pair<std::size_t,std::variant<ResultType,Token>>> stack;\
-  \static constexpr const std::size_t Action[]["
-  <>show (length tokens)<>"] = {" <> actionTable <> "};\
-  \static constexpr const std::size_t GOTO[]["
-  <>show (length nonTerminals)<>"] = {" <> gotoTable <> "};\
-  \auto top() const { return stack.empty() ? 0 : stack.top().first; }\
+  \static const std::size_t Action["<>show (length states)<>"]["
+    <>show (length tokens)<>"];\
+  \static const std::size_t GOTO["<>show (length states)<>"]["
+    <>show (length nonTerminals)<>"];\
+  \std::size_t top() const;\
 \public:\
-  \"<>name<>"(Lexer *lex, bool debug = false):lex(lex),debug(debug) {}\
-  \ResultType parse() {\
+  \"<>name<>"(Lexer *lex, bool debug = false);\
+  \ResultType parse();\
+\};\n\
+\#endif\n\
+\") , (base <> ".cpp", "\
+  \#include \""<>base<>".h\"\n\
+  \#include <stdexcept>\n\
+  \#include <iostream>\n\
+  \const std::size_t "<>name<>"::Action["<>show (length states)<>"]["
+    <>show (length tokens)<>"] = {" <> actionTable <> "};\
+  \const std::size_t "<>name<>"::GOTO["<>show (length states)<>"]["
+    <>show (length nonTerminals)<>"] = {" <> gotoTable <> "};\
+  \std::size_t "<>name<>"::top() const { return stack.empty() ? 0 : stack.top().first; }\
+  \"<>name<>"::"<>name<>"(Lexer *lex, bool debug):lex(lex),debug(debug) {}\
+  \ResultType "<>name<>"::parse() {\
     \Token a = lex->getNextToken();\
     \while (true) {\
       \auto action = Action[top()][static_cast<std::size_t>(a.type)];\
@@ -147,28 +164,21 @@ writeLRParser name tokens r t = "\
         \break;\
       \}\
     \}\
-  \}\
-\};\n\
-\#endif\n\
-\"
+  \}\n")]
   where
-  make2dTable mkcell rows cols = intercalate "," $ map mkrow rows
-    where mkrow row = "{"<>intercalate "," (map (mkcell row) cols)<>"}"
-  actionTable = make2dTable mkActionTableCell states tokens
-  gotoTable = make2dTable mkGotoTableCell states nonTerminals
-  mkGotoTableCell st nt = maybe "0" show $
+  make2dTableM mkcell rows cols = intercalate "," <$> mapM mkrow rows
+        where mkrow row = ("{"<>) . (<>"}") . intercalate "," <$> mapM (mkcell row) cols
+  mkGotoTableCell st nt = return . maybe "0" show $
      M.lookup (st, NonTerm nt) (snd t) >>= flip M.lookup statesMap
   actionIndex a = show $ fromJust $ M.lookup a actionsMap
-  mkActionTableCell st tok = actionIndex $ case possibleActions st tok of
-    [] -> Reject
-    [x] -> x
-    xs -> reportConflicts st tok xs
-  reportConflicts st tok xs = error $ "Conflicts detected in state "
-    <> stateIndex st
-    <> " with token "
-    <> showSymbol tok
-    <> ":\n"
-    <> unlines (map showAction xs)
+  mkActionTableCell st tok = actionIndex <$> case possibleActions st tok of
+    [] -> return Reject
+    [x] -> return x
+    xs -> reportConflicts st tok xs >> return (head xs)
+  reportConflicts st tok xs = tell $
+    "Conflicts detected in state " <> stateIndex st <> " with token " <> showSymbol tok <> "."
+    : "Choosing the first alternative (usually shift):"
+    : map showAction xs
   stateIndex st = show $ fromJust $ M.lookup st statesMap
   showAction (Shift n) = "Shift to state " <> show n
   showAction (Reduce ((h, b), _)) = "Reduce " <> h <> " -> " <> showBody b
@@ -275,9 +285,8 @@ printTable r t = --show t
 pointClosure :: LRPoint a => RulesMap -> S.Set a -> S.Set a
 pointClosure r = unify . flip evalState S.empty . fmap S.unions . mapM doAdd . S.toList
   where
-  unify = S.fromList . map combine . groupBy ((==) `on` lr0) . sortBy (compare `on` lr0) . S.toList
-  combine xs@(x:_) = modLookahead x (S.unions $ map pointLookahead xs)
-  combine [] = error "x-X"
+  unify = S.fromList . map combine . NE.groupBy ((==) `on` lr0) . sortBy (compare `on` lr0) . S.toList
+  combine (x NE.:| xs) = modLookahead x (S.unions $ map pointLookahead (x:xs))
   doAdd p | (NonTerm nt:beta) <- pointRight p = do
     seen <- gets (S.member p)
     if not seen

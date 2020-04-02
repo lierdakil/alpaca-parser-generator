@@ -13,9 +13,13 @@ import Data.Function
 import Data.List
 import Data.Maybe
 import Data.List.NonEmpty (NonEmpty(..))
+import MonadTypes
 
-makeLALRParser :: String -> [Symbol] -> String -> String
-makeLALRParser name tokens input = writeLRParser name tokens r . lalrify $ buildLRAutomaton @LR1Point start r
+makeLALRParser :: (Monad m)
+             => String -> FilePath -> String -> [Symbol]
+             -> MyMonadT m [(FilePath,String)]
+makeLALRParser input base name tokens
+  = writeLRParser base name tokens r . lalrify $ buildLRAutomaton @LR1Point start r
   where rules = parse input
         start = let Rule h _ : _ = rules in h
         r = mkRulesMap (Rule "%S" (([NonTerm start], Nothing) :| []) : rules)

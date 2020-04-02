@@ -18,23 +18,6 @@ makeLLParser = buildLLParser . parse
 
 buildLLParser :: Monad m => Rules -> FilePath -> [Symbol] -> MyMonadT m [(FilePath,String)]
 buildLLParser rules basename tokens = do
-  let
-    bodyMap = M.fromList $ zip allBodies [(0::Word)..]
-    actionMap = M.fromList $ zip (map snd allActions) [(0::Word)..]
-    showIdxs (a, b) = braces $ showIdx a <> "," <> showIdx b
-    showIdx :: Maybe Word -> String
-    showIdx Nothing = "0"
-    showIdx (Just x) = show (x+1)
-    writeCell nonterm term
-      | Just (act, b:rest) <- M.lookup (NonTerm nonterm, term) tt
-      = do
-          unless (null rest) $
-            tell ["LL parser has multiple rules in the same cell: " <> show (b:rest),
-                  "\tChoosing " <> show b]
-          return (M.lookup b bodyMap, act >>= flip M.lookup actionMap)
-      | otherwise = return (Nothing, Nothing)
-    tt = M.fromListWith (liftM2 (++)) . concatMap r2t $ M.toList t
-    r2t ((nt, b), (ts, act)) = map (\term -> ((nt, term), (act, [b]))) $ S.toList ts
   cells <- mapM (forM tokens . writeCell) nonTerms
   let transTable = intercalate "," . map ((braces . intercalate ",") . map showIdxs) $ cells
   return [
@@ -43,7 +26,6 @@ buildLLParser rules basename tokens = do
     , (basename <> ".cpp", sourceFile transTable)
     ]
   where
-  braces x = "{"<>x<>"}"
   headerFile = "\
 \#ifndef PARSER_LL_H\n\
 \#define PARSER_LL_H\n\
@@ -118,6 +100,23 @@ buildLLParser rules basename tokens = do
   \return std::get<0>(resultStack.top());\
 \}\
 \"
+  bodyMap = M.fromList $ zip allBodies [(0::Word)..]
+  actionMap = M.fromList $ zip (map snd allActions) [(0::Word)..]
+  showIdxs (a, b) = braces $ showIdx a <> "," <> showIdx b
+  showIdx :: Maybe Word -> String
+  showIdx Nothing = "0"
+  showIdx (Just x) = show (x+1)
+  writeCell nonterm term
+    | Just (act, b:rest) <- M.lookup (NonTerm nonterm, term) tt
+    = do
+        unless (null rest) $
+          tell ["LL parser has multiple rules in the same cell: " <> show (b:rest),
+                "\tChoosing " <> show b]
+        return (M.lookup b bodyMap, act >>= flip M.lookup actionMap)
+    | otherwise = return (Nothing, Nothing)
+  tt = M.fromListWith (liftM2 (++)) . concatMap r2t $ M.toList t
+  r2t ((nt, b), (ts, act)) = map (\term -> ((nt, term), (act, [b]))) $ S.toList ts
+  braces x = "{"<>x<>"}"
   quote x = '"':x <> "\""
   startSymbol = let (Rule h _) = head rules in NonTerm h
   r = mkRulesMap rules

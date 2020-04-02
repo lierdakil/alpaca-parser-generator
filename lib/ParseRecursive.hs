@@ -15,7 +15,7 @@ makeParser :: Monad m => String -> FilePath -> MyMonadT m [(FilePath,String)]
 makeParser = makeRecursiveParser . parse
 
 makeRecursiveParser :: Monad m => [Rule] -> FilePath -> MyMonadT m [(FilePath,String)]
-makeRecursiveParser [] _ = throwError "No rules!"
+makeRecursiveParser [] _ = throwError ["No rules!"]
 makeRecursiveParser rules@(Rule h _:_) basename = do
   parsers <- mapM (makeRuleParser actionableRules) rules
   return [(basename <> ".h", "\
@@ -78,7 +78,7 @@ buildAlt ars h (Term s:b, act) = return $ "if(curTok.type == TokenType::Tok_"<>s
   \auto _1 = curTok; curTok = lex->getNextToken();"
   <> buildBody ars (zip [2..] b) <> buildAction act
   <> "}"
-buildAlt _ h (b, _) = throwError $ "Recursive parser can not handle body " <> h <> " -> " <> showBody b
+buildAlt _ h (b, _) = throwError . pure $ "Recursive parser can not handle body " <> h <> " -> " <> showBody b
 
 buildAction :: Maybe String -> String
 buildAction Nothing = ""

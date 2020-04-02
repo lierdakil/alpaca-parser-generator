@@ -105,7 +105,7 @@ data Lang = CPP
 
 makeDFA :: Monad m => [String] -> MyMonadT m ([(FilePath, String)], DFA)
 makeDFA input = do
-  defs <- liftEither $ mapM (fmap regex . scanLine) input
+  defs <- liftEither . left lines $ mapM (fmap regex . scanLine) input
   let nfa = evalState (buildNFA defs) 0
       dfa = simplifyDFA . nfaToDFA $ nfa
       debug = [("nfa.gv", nfaToGraphviz nfa), ("dfa.gv", dfaToGraphviz dfa)]
