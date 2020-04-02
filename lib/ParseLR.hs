@@ -178,7 +178,7 @@ writeLRParser base name tokens r t = do
   mkActionTableCell st tok = actionIndex <$> case possibleActions st tok of
     [] -> return Reject
     [x] -> return x
-    (x:xs) -> reportConflicts st tok (x:|xs) >> return (head xs)
+    (x:xs) -> reportConflicts st tok (x:|xs) >> return x
   reportConflicts st tok (x:|xs) = do
     tell $
       "Conflicts detected in state " <> stateIndex st <> " with token " <> showSymbol tok <> "."
@@ -201,7 +201,10 @@ writeLRParser base name tokens r t = do
   writeAction (a, n) = "case " <> show n <> ": "
     <> actionBody a
     <> "break;"
-  actionBody Reject = "throw std::runtime_error(\"Reject\");"
+  actionBody Reject = "throw std::runtime_error(\
+      \\"Rejection state reached when encoutered symbol \" \
+      \+ ::to_string(a.type) + \" in state \" \
+      \+ std::to_string(top()));"
   actionBody (Shift st) = "\
     \stack.push("<> show st <>");\
     \a = lex->getNextToken();\
