@@ -3,6 +3,8 @@ module RegexParse where
 
 import RegexLex
 import Data.List.NonEmpty (NonEmpty(..))
+import Data.Text (Text)
+import qualified Data.Text as T
 }
 
 %name regex
@@ -82,10 +84,10 @@ GrpCont
   |              { [] }
 
 {
-data RegexDef = RegexDef (Maybe String) RegexPattern Action
+data RegexDef = RegexDef (Maybe Text) RegexPattern Action
   deriving Show
 
-data Action = NoAction | Action String deriving (Show, Eq, Ord)
+data Action = NoAction | Action Text deriving (Show, Eq, Ord)
 
 data CharPattern =
     CChar Char

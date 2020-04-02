@@ -3,6 +3,7 @@
            , GeneralizedNewtypeDeriving
            , UndecidableInstances
            , FlexibleContexts
+           , OverloadedStrings
            #-}
 module ParseLALR (makeLALRParser) where
 
@@ -15,30 +16,34 @@ import Data.Maybe
 import Data.List.NonEmpty (NonEmpty(..), (<|))
 import qualified Data.List.NonEmpty as NE
 import MonadTypes
+import Data.Text (Text)
+import qualified Data.Text as T
+import Utils
 
 makeLALRParser :: (Monad m)
-             => String -> FilePath -> String -> [Symbol]
-             -> MyMonadT m [(FilePath,String)]
+             => Text -> FilePath -> Text -> [Symbol]
+             -> MyMonadT m [(FilePath,Text)]
 makeLALRParser input base name tokens
   = do
+    rules <- parse input
+    let Rule start _ :| _ = rules
+        r = mkRulesMap (Rule ExtendedStartRule (([NonTerm start], Nothing) :| []) <| rules)
     automaton <- lalrify $ buildLRAutomaton @LR1Point start r
     writeLRParser base name tokens r automaton
-  where rules = parse input
-        start = let Rule h _ :| _ = rules in h
-        r = mkRulesMap (Rule ExtendedStartRule (([NonTerm start], Nothing) :| []) <| rules)
 
 lalrify :: Monad m => LRAutomaton LR1Point -> MyMonadT m (LRAutomaton LALRPoint)
-lalrify t = (,) (lookup' (fst t)) . M.fromAscList <$> mapM ensureUnique (NE.groupAllWith fst (map conv tl))
+lalrify t = (,) (lookup' (fst t)) . M.fromAscList
+    <$> mapM ensureUnique (NE.groupAllWith fst (map conv tl))
   where
     ensureUnique (x :| []) = return x
     ensureUnique ((k,x) :| xs)
       = if all ((==x) . snd) xs
         then return (k, x)
         else do
-          tell $ "While building LALR automaton, state "<>show k<>" became \
+          tell $ "While building LALR automaton, state "<>tshow k<>" became \
                  \ non-deterministic:"
-                 : map show (x:map snd xs)
-          tell [ "Will use " <> show x ]
+                 : map tshow (x:map snd xs)
+          tell [ "Will use " <> tshow x ]
           return (k, x)
     conv ((stk, x), stv) = ((lookup' stk, x), lookup' stv)
     lookup' x = fromJust $ M.lookup (lr0s x) gstates

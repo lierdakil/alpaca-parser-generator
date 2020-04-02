@@ -3,6 +3,7 @@
            , TypeApplications
            , ScopedTypeVariables
            , PatternSynonyms
+           , OverloadedStrings
            #-}
 module ParseLR (Proxy(..)
   , LRPoint(..)
@@ -30,6 +31,9 @@ import MonadTypes
 import Control.Monad.State
 import Text.Layout.Table
 import qualified Control.Arrow as A
+import Data.Text (Text)
+import qualified Data.Text as T
+import Utils
 
 class (Ord a, Ord (Lookahead a)) => LRPoint a where
   type family Lookahead a
@@ -37,35 +41,35 @@ class (Ord a, Ord (Lookahead a)) => LRPoint a where
   modLr0 :: a -> LR0Point -> a
   pointLookahead :: a -> S.Set (Lookahead a)
   modLookahead :: a -> S.Set (Lookahead a) -> a
-  startPoint :: String -> a
-  makeFirstPoint :: RulesMap -> a -> String -> [Symbol] -> [Symbol] -> Maybe String -> a
+  startPoint :: Text -> a
+  makeFirstPoint :: RulesMap -> a -> Text -> [Symbol] -> [Symbol] -> Maybe Text -> a
   lookaheadMatches :: a -> Symbol -> Bool
-  showLookahead :: a -> String
+  showLookahead :: a -> Text
 
 nextPoint :: LRPoint a => Symbol -> a -> Maybe a
 nextPoint s p = modLr0 p <$> nextPoint' (lr0 p)
   where nextPoint' p'@LR0Point{lr0PointRight=(x:xs), lr0PointLeft=ys}
           | x == s = Just $ p'{lr0PointRight=xs, lr0PointLeft=x:ys}
         nextPoint' _ = Nothing
-pointHead :: LRPoint a => a -> String
+pointHead :: LRPoint a => a -> Text
 pointHead = lr0PointHead . lr0
 pointLeft :: LRPoint a => a -> [Symbol]
 pointLeft = reverse . lr0PointLeft . lr0
 pointRight :: LRPoint a => a -> [Symbol]
 pointRight = lr0PointRight . lr0
-pointAction :: LRPoint a => a -> Maybe ((String, [Symbol]), Maybe String)
+pointAction :: LRPoint a => a -> Maybe ((Text, [Symbol]), Maybe Text)
 pointAction p
   | null (pointRight p) = Just ((pointHead p, pointLeft p), lr0PointAction (lr0 p))
   | otherwise = Nothing
 
 data LR0Point = LR0Point {
-    lr0PointAction :: Maybe String
-  , lr0PointHead :: String
+    lr0PointAction :: Maybe Text
+  , lr0PointHead :: Text
   , lr0PointLeft :: [Symbol]
   , lr0PointRight :: [Symbol]
   } deriving (Show, Eq, Ord)
 
-pattern ExtendedStartRule :: String
+pattern ExtendedStartRule :: Text
 pattern ExtendedStartRule = "%S"
 
 instance LRPoint LR0Point where
@@ -98,7 +102,7 @@ instance LRPoint LR1Point where
       else S.map fromJust firstBeta
     where firstBeta = first r beta
   lookaheadMatches p x = S.member x (lr1PointLookahead p)
-  showLookahead = intercalate "/" . map showSymbol . S.toList . pointLookahead
+  showLookahead = T.intercalate "/" . map showSymbol . S.toList . pointLookahead
 
 nextSym :: LRPoint a => a -> Maybe Symbol
 nextSym p | (x:_) <- pointRight p = Just x
@@ -108,25 +112,26 @@ type LRState p = S.Set p
 type LRAutomaton p = (LRState p, M.Map (LRState p, Symbol) (LRState p))
 
 makeLRParser :: forall p m. (LRPoint p, Monad m)
-             => Proxy p -> String -> FilePath -> String -> [Symbol]
-             -> MyMonadT m [(FilePath,String)]
+             => Proxy p -> Text -> FilePath -> Text -> [Symbol]
+             -> MyMonadT m [(FilePath,Text)]
 makeLRParser _ input base name tokens
-  = writeLRParser base name tokens r $ buildLRAutomaton @p start r
-  where rules = parse input
-        start = let Rule h _ :| _ = rules in h
+  = do
+    rules <- parse input
+    let Rule start _ :| _ = rules
         r = mkRulesMap (Rule ExtendedStartRule (([NonTerm start, TermEof], Nothing) :| []) <| rules)
+    writeLRParser base name tokens r $ buildLRAutomaton @p start r
 
-data Action p = Shift Word | Reduce ((String, [Symbol]), Maybe String) | Reject deriving (Show, Eq, Ord)
+data Action p = Shift Word | Reduce ((Text, [Symbol]), Maybe Text) | Reject deriving (Show, Eq, Ord)
 
-writeLRParser :: forall p m. (LRPoint p, Monad m) => FilePath -> String -> [Symbol] -> RulesMap -> LRAutomaton p -> MyMonadT m [(FilePath,String)]
+writeLRParser :: forall p m. (LRPoint p, Monad m) => FilePath -> Text -> [Symbol] -> RulesMap -> LRAutomaton p -> MyMonadT m [(FilePath,Text)]
 writeLRParser base name tokens r t = do
   actionTable <- make2dTableM mkActionTableCell states tokens
   gotoTable <- make2dTableM mkGotoTableCell states nonTerminals
   return [
       (base <> ".txt",  printTable r t)
     , (base <> ".h", "\
-\#ifndef "<> map toUpper name <> "_H\n\
-\#define "<> map toUpper name <> "_H\n\
+\#ifndef "<> T.map toUpper name <> "_H\n\
+\#define "<> T.map toUpper name <> "_H\n\
 \#include \"lexer.h\"\n\
 \#include \"parseResult.h\"\n\
 \#include <stack>\n\
@@ -135,10 +140,10 @@ writeLRParser base name tokens r t = do
   \Lexer *lex;\
   \bool debug;\
   \std::stack<std::pair<std::size_t,std::variant<ResultType,Token>>> stack;\
-  \static const std::size_t Action["<>show (length states)<>"]["
-    <>show (length tokens)<>"];\
-  \static const std::size_t GOTO["<>show (length states)<>"]["
-    <>show (length nonTerminals)<>"];\
+  \static const std::size_t Action["<>tshow (length states)<>"]["
+    <>tshow (length tokens)<>"];\
+  \static const std::size_t GOTO["<>tshow (length states)<>"]["
+    <>tshow (length nonTerminals)<>"];\
   \std::size_t top() const;\
 \public:\
   \"<>name<>"(Lexer *lex, bool debug = false);\
@@ -146,21 +151,21 @@ writeLRParser base name tokens r t = do
 \};\n\
 \#endif\n\
 \") , (base <> ".cpp", "\
-  \#include \""<>base<>".h\"\n\
+  \#include \""<>T.pack base<>".h\"\n\
   \#include <stdexcept>\n\
   \#include <iostream>\n\
-  \static const std::string stateToString(std::size_t state) {\
-    \static constexpr const char* names[] = {"<>intercalate "," stateToSym<>"};\
+  \static const std::Text stateToString(std::size_t state) {\
+    \static constexpr const char* names[] = {"<>T.intercalate "," stateToSym<>"};\
     \return names[state];\
   \}\
-  \static const std::string expectedSym(std::size_t state) {\
-    \static constexpr const char* names[] = {"<>intercalate "," expectedSymbols<>"};\
+  \static const std::Text expectedSym(std::size_t state) {\
+    \static constexpr const char* names[] = {"<>T.intercalate "," expectedSymbols<>"};\
     \return names[state];\
   \}\
-  \const std::size_t "<>name<>"::Action["<>show (length states)<>"]["
-    <>show (length tokens)<>"] = {" <> actionTable <> "};\
-  \const std::size_t "<>name<>"::GOTO["<>show (length states)<>"]["
-    <>show (length nonTerminals)<>"] = {" <> gotoTable <> "};\
+  \const std::size_t "<>name<>"::Action["<>tshow (length states)<>"]["
+    <>tshow (length tokens)<>"] = {" <> actionTable <> "};\
+  \const std::size_t "<>name<>"::GOTO["<>tshow (length states)<>"]["
+    <>tshow (length nonTerminals)<>"] = {" <> gotoTable <> "};\
   \std::size_t "<>name<>"::top() const { return stack.empty() ? 0 : stack.top().first; }\
   \"<>name<>"::"<>name<>"(Lexer *lex, bool debug):lex(lex),debug(debug) {}\
   \ResultType "<>name<>"::parse() {\
@@ -168,7 +173,7 @@ writeLRParser base name tokens r t = do
     \while (true) {\
       \auto action = Action[top()][static_cast<std::size_t>(a.type)];\
       \switch (action) {\
-      \"<> concatMap writeAction actionsMapList <> "\
+      \"<> foldMap writeAction actionsMapList <> "\
       \default:\
         \if(debug)std::cerr<<\"Shift to \"<<action<<std::endl;\
         \stack.push({action, a});\
@@ -178,11 +183,11 @@ writeLRParser base name tokens r t = do
     \}\
   \}\n")]
   where
-  make2dTableM mkcell rows cols = intercalate "," <$> mapM mkrow rows
-        where mkrow row = ("{"<>) . (<>"}") . intercalate "," <$> mapM (mkcell row) cols
-  mkGotoTableCell st nt = return . maybe "0" show $
+  make2dTableM mkcell rows cols = T.intercalate "," <$> mapM mkrow rows
+        where mkrow row = ("{"<>) . (<>"}") . T.intercalate "," <$> mapM (mkcell row) cols
+  mkGotoTableCell st nt = return . maybe "0" tshow $
      M.lookup (st, NonTerm nt) (snd t) >>= flip M.lookup statesMap
-  actionIndex a = show $ fromJust $ M.lookup a actionsMap
+  actionIndex a = tshow $ fromJust $ M.lookup a actionsMap
   mkActionTableCell st tok = actionIndex <$> case possibleActions st tok of
     [] -> return Reject
     [x] -> return x
@@ -192,8 +197,8 @@ writeLRParser base name tokens r t = do
       "Conflicts detected in state " <> stateIndex st <> " with token " <> showSymbol tok <> "."
       : map showAction (x:xs)
     tell ["Will use " <> showAction x]
-  stateIndex st = show $ fromJust $ M.lookup st statesMap
-  showAction (Shift n) = "Shift to state " <> show n
+  stateIndex st = tshow $ fromJust $ M.lookup st statesMap
+  showAction (Shift n) = "Shift to state " <> tshow n
   showAction (Reduce ((h, b), _)) = "Reduce " <> h <> " -> " <> showBody b
   showAction Reject = "Reject"
   possibleActions st tok = shiftActions st tok <> reduceActions st tok
@@ -206,11 +211,11 @@ writeLRParser base name tokens r t = do
     | ps <- mapMaybe pointAction . filter (`lookaheadMatches` tok) $ S.toList (pointClosure r st)
     = map Reduce ps
   writeAction (Shift _, _) = ""
-  writeAction (a, n) = "case " <> show n <> ": "
+  writeAction (a, n) = "case " <> tshow n <> ": "
     <> actionBody a
     <> "break;"
   actionBody Reject = "{\
-      \std::string parsed=stateToString(top());\
+      \std::Text parsed=stateToString(top());\
       \auto lastSt = top();\
       \while(!stack.empty()) { stack.pop(); parsed = stateToString(top()) + \" \" + parsed; }\
       \throw std::runtime_error(\
@@ -219,13 +224,13 @@ writeLRParser base name tokens r t = do
       \+ std::to_string(lastSt) + \". Expected \\\"\" + expectedSym(lastSt) +\"\\\"\");\
       \}"
   actionBody (Shift st) = "\
-    \stack.push("<> show st <>");\
+    \stack.push("<> tshow st <>");\
     \a = lex->getNextToken();\
   \"
   actionBody (Reduce ((ExtendedStartRule, _), _)) = "return std::get<0>(stack.top().second);"
   actionBody (Reduce ((h, body), mcode)) = "{"
     <> "if(debug) std::cerr << \"Reduce using "<> h <>" -> "<>showBody body<>";\\n\";"
-    <> concat (reverse $ zipWith showArg body [1::Word ..])
+    <> T.concat (reverse $ zipWith showArg body [1::Word ..])
     <> "auto gt = " <> goto <> ";"
     <> "if(gt==0) throw std::runtime_error(\"No goto\");"
     <> "if(debug) std::cerr << top() << \" is now on top of the stack;\\n\""
@@ -233,25 +238,24 @@ writeLRParser base name tokens r t = do
     <> "stack.push({gt,"<>result<>"});"
     <> "}"
     where
+      result :: Text
       result
         | Just code <- mcode
         = "([]("<>argDefs<>") {" <> code <> "})("<>args<>")"
         | otherwise
         = "ResultType()"
-      goto = "GOTO[top()]["<>show (nonTermIdx h)<>"/*"<>h<>"*/]"
-      argDefs = intercalate "," $ zipWith showArgDef body [1::Word ..]
-      args = intercalate "," $ zipWith showCallArg body [1::Word ..]
-      showArgDef _ i = "const auto &_" <> show i
-      showCallArg _ i = "_" <> show i
-      showArg (NonTerm _) i = "auto _"<>show i<>"=std::get<0>(stack.top().second); stack.pop();"
-      showArg _ i = "auto _"<>show i<>"=std::get<1>(stack.top().second); stack.pop();"
+      goto = "GOTO[top()]["<>tshow (nonTermIdx h)<>"/*"<>h<>"*/]"
+      argDefs = T.intercalate "," $ zipWith showArgDef body [1::Word ..]
+      args = T.intercalate "," $ zipWith showCallArg body [1::Word ..]
+      showArgDef _ i = "const auto &_" <> tshow i
+      showCallArg _ i = "_" <> tshow i
+      showArg (NonTerm _) i = "auto _"<>tshow i<>"=std::get<0>(stack.top().second); stack.pop();"
+      showArg _ i = "auto _"<>tshow i<>"=std::get<1>(stack.top().second); stack.pop();"
   actionsMap = M.fromList actionsMapList
   actionsMapList = zip actions [0::Word ..]
   states = fst t : S.toList (S.fromList $ map snd tl)
   tl = M.toList (snd t)
-  fromJust' _ (Just x) = x
-  fromJust' m Nothing = error m
-  nonTermIdx nt = fromJust' ("nonTermIdx" <> show nt) $ M.lookup nt nonTerminalsMap
+  nonTermIdx nt = fromJust $ M.lookup nt nonTerminalsMap
   nonTerminalsMap = M.fromList $ zip nonTerminals [0::Word ..]
   nonTerminals = nub $ mapMaybe (isNonTerm . snd) $ M.keys (snd t)
   isNonTerm (NonTerm x) = Just x
@@ -259,7 +263,7 @@ writeLRParser base name tokens r t = do
   expectedSymbols = map expected states
     where
       expected st
-        = quote $ intercalate "/" $ map next $ S.toList st
+        = quote $ T.intercalate "/" $ map next $ S.toList st
       next st
         | (x:_) <- pointRight st = showSymbol x
         | otherwise = showLookahead st
@@ -270,7 +274,7 @@ writeLRParser base name tokens r t = do
         = quote $ showSymbol $ last (pointLeft el)
         | otherwise
         = quote "·"
-  quote x = '"':x <> "\""
+  quote x = "\"" <> x <> "\""
   statesMapList = zip states [0::Word ..]
   statesMap = M.fromList statesMapList
   allReductions = nub $ concatMap getReduction states
@@ -278,7 +282,7 @@ writeLRParser base name tokens r t = do
   actions = Reject : map (Shift . snd) (tail statesMapList)
     <> map Reduce allReductions
 
-buildLRAutomaton :: forall p. LRPoint p => String -> RulesMap -> LRAutomaton p
+buildLRAutomaton :: forall p. LRPoint p => Text -> RulesMap -> LRAutomaton p
 buildLRAutomaton oldStartRule r = (,) startState . fst . flip execState (M.empty, S.empty) $ buildGotoTable startState
   where
   startState = S.singleton $ startPoint oldStartRule
@@ -294,28 +298,28 @@ buildLRAutomaton oldStartRule r = (,) startState . fst . flip execState (M.empty
         modify (A.first (M.insert (i, s) iNext))
         buildGotoTable iNext
 
-printTable :: LRPoint p => RulesMap -> LRAutomaton p -> String
-printTable r t = --show t
+printTable :: LRPoint p => RulesMap -> LRAutomaton p -> Text
+printTable r t = T.pack $ --tshow t
   tableString (repeat def) unicodeS (titlesH ["stateNo", "stateDef"]) stateRows
-  <> "\n" <> tableString (repeat def) unicodeS (titlesH titles) (map rowG rows)
+  <> "\n" <> tableString (repeat def) unicodeS (titlesH $ map T.unpack titles) (map (rowG . map T.unpack) rows)
   where
   stateMapList = zip states [0::Word ..]
   stateMap = M.fromList stateMapList
-  stateRows = map (\(s, n) -> colsAllG top [[show n], showState s]) stateMapList
+  stateRows = map (\(s, n) -> colsAllG top [[show n], map T.unpack $ showState s]) stateMapList
   showState st = map showPoint (S.toList st) <> ("---" : map showPoint (S.toList new))
     where cls = pointClosure r st
           new = cls S.\\ st
   showPoint p
-    = unwords (pointHead p : "->" : map showSymbol (pointLeft p) <> ["."] <> map showSymbol (pointRight p)) <> ","
+    = T.unwords (pointHead p : "->" : map showSymbol (pointLeft p) <> ["."] <> map showSymbol (pointRight p)) <> ","
       <> showLookahead p
   states = fst t : (S.toList . S.fromList $ map snd tl)
   symbols = S.toList . S.fromList $ map (snd . fst) tl
   titles = "" : map showSymbol symbols
   tl = M.toList (snd t)
   rows = map makeRow stateMapList
-  makeRow (st, n) = show n : map (makeCell st) symbols
+  makeRow (st, n) = tshow n : map (makeCell st) symbols
   makeCell st sym
-    | Just cell <- M.lookup (st, sym) (snd t) = show $ fromJust (M.lookup cell stateMap)
+    | Just cell <- M.lookup (st, sym) (snd t) = tshow $ fromJust (M.lookup cell stateMap)
     | otherwise = ""
 
 pointClosure :: LRPoint a => RulesMap -> S.Set a -> S.Set a

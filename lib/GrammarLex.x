@@ -1,5 +1,7 @@
 {
+{-# LANGUAGE OverloadedStrings #-}
 module GrammarLex where
+import Data.Text (Text, pack)
 }
 
 %wrapper "monad"
@@ -24,12 +26,12 @@ data Token =
   | TAlternative
   | TSep
   | TTermEof
-  | TTerminal String
-  | TNonTerminal String
-  | TAction String
+  | TTerminal Text
+  | TNonTerminal Text
+  | TAction Text
   | TEOF
   deriving (Eq, Show)
 
 alexEOF = return TEOF
-mkTok f = token $ \(_,_,_,s) len -> f (take len s)
+mkTok f = token $ \(_,_,_,s) len -> f (pack (take len s))
 }

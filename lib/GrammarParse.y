@@ -3,6 +3,7 @@ module GrammarParse where
 
 import GrammarLex
 import Data.List.NonEmpty (NonEmpty(..))
+import Data.Text (Text)
 }
 
 %name grammar
@@ -53,8 +54,8 @@ Symbol
   | teof                  { TermEof }
 
 {
-data Symbol = TermEof | Term String | NonTerm String deriving (Eq, Ord, Show)
-data Rule = Rule String (NonEmpty ([Symbol], Maybe String)) deriving (Eq, Show)
+data Symbol = TermEof | Term Text | NonTerm Text deriving (Eq, Ord, Show)
+data Rule = Rule Text (NonEmpty ([Symbol], Maybe Text)) deriving (Eq, Show)
 
 parseError :: [Token] -> a
 parseError x = error $ "Parse error at" <> show x

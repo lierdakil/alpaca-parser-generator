@@ -1,4 +1,4 @@
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TupleSections, OverloadedStrings #-}
 module FA (
     StateAttr
   , NFA
@@ -20,34 +20,37 @@ import Data.List
 import Data.Maybe
 import Control.Monad.State
 import Control.Arrow
+import Data.Text (Text)
+import qualified Data.Text as T
+import Utils
 
-type StateAttr = S.Set (Maybe String, Action)
+type StateAttr = S.Set (Maybe Text, Action)
 type NFA = IM.IntMap (StateAttr, M.Map (Maybe (NonEmpty CharPattern)) [Int])
 type DFA = IM.IntMap (StateAttr, M.Map (NonEmpty CharPattern) Int)
 
-nfaToGraphviz :: NFA -> String
-nfaToGraphviz fa = "digraph{rankdir=LR;" <> concatMap node l <> "}"
+nfaToGraphviz :: NFA -> Text
+nfaToGraphviz fa = "digraph{rankdir=LR;" <> foldMap node l <> "}"
   where l = IM.toList fa
-        node (i, (a, t)) = show i <> "[label=\""<> intercalate "/" lbl <>"\"" <> acc <> "];"
-                                  <> concatMap (trans i) (M.toList t)
+        node (i, (a, t)) = tshow i <> "[label=\""<> T.intercalate "/" lbl <> "\"" <> acc <> "];"
+                                  <> foldMap (trans i) (M.toList t)
                            where lbl = mapMaybe fst $ S.toList a
                                  acc = if not $ null lbl then ", peripheries=2" else ""
-        trans i (c, ss) = concatMap (\s -> show i <> " -> " <> show s <> "[label=\""<> showCharPattern c<>"\"];") ss
+        trans i (c, ss) = foldMap (\s -> tshow i <> " -> " <> tshow s <> "[label=\""<> showCharPattern c<>"\"];") ss
 
-dfaToGraphviz :: DFA -> String
-dfaToGraphviz fa = "digraph{rankdir=LR;" <> concatMap node l <> "}"
+dfaToGraphviz :: DFA -> Text
+dfaToGraphviz fa = "digraph{rankdir=LR;" <> foldMap node l <> "}"
   where l = IM.toList fa
-        node (i, (a, t)) = show i <> "[label=\""<> intercalate "/" lbl <>"\"" <> acc <> "];"
-                                  <> concatMap (trans i) (M.toList t)
+        node (i, (a, t)) = tshow i <> "[label=\""<> T.intercalate "/" lbl <>"\"" <> acc <> "];"
+                                  <> foldMap (trans i) (M.toList t)
                            where lbl = mapMaybe fst $ S.toList a
                                  acc = if not $ null lbl then ", peripheries=2" else ""
-        trans i (c, ss) = (\s -> show i <> " -> " <> show s <> "[label=\""<> showCharPattern (Just c)<>"\"];") ss
+        trans i (c, ss) = (\s -> tshow i <> " -> " <> tshow s <> "[label=\""<> showCharPattern (Just c)<>"\"];") ss
 
-showCharPattern :: Maybe (NonEmpty CharPattern) -> String
+showCharPattern :: Maybe (NonEmpty CharPattern) -> Text
 showCharPattern Nothing = "ε"
-showCharPattern (Just (x :| rest)) = concatMap show1 $ x : rest
-  where show1 (CChar c) = ['\'', c, '\'']
-        show1 (CRange a b) = ['[',a,'-',b,']']
+showCharPattern (Just (x :| rest)) = foldMap show1 $ x : rest
+  where show1 (CChar c) = T.pack ['\'', c, '\'']
+        show1 (CRange a b) = T.pack ['[',a,'-',b,']']
         show1 CAny = "'.'"
 
 nfaToDFASt :: NFA -> State (Int, IS.IntSet, [(Int, (StateAttr, IS.IntSet))]) DFA
@@ -88,7 +91,7 @@ ecls nfa st = (accs, IS.fromList stl)
   -- ecls' :: [Int] -> (Bool, [Int])
   ecls' arg = let res = map ecls1 arg
                   acc = S.unions $ map fst res
-                  sts = concatMap snd res
+                  sts = foldMap snd res
               in (acc, sts)
   -- ecls1 :: Int -> (Bool, [Int])
   ecls1 st2
@@ -113,7 +116,7 @@ simplifyDFA dfa = IM.fromList $ mapMaybe simpDFA lst
     | otherwise = st
   equalStates =
       IM.fromList
-    . concatMap (\(x:|xs) -> map ((, fst x) . fst) xs)
+    . foldMap (\(x:|xs) -> map ((, fst x) . fst) xs)
     . NE.groupAllWith snd
     $ lst
 

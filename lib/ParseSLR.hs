@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilies, OverloadedStrings #-}
 module ParseSLR where
 
 import Grammar
@@ -6,6 +6,8 @@ import ParseLR
 import qualified Data.Set as S
 import Data.Function
 import Data.List
+import Data.Text (Text)
+import qualified Data.Text as T
 
 data SLRPoint = SLRPoint {
     lr0Point :: LR0Point
@@ -25,7 +27,7 @@ instance LRPoint SLRPoint where
   pointLookahead = slrLookahead
   modLookahead p v = p{slrLookahead=v}
   startPoint rule = SLRPoint (startPoint rule) $ S.singleton TermEof
-  showLookahead p = intercalate "/" $ map showSymbol (S.toList $ slrLookahead p)
+  showLookahead p = T.intercalate "/" $ map showSymbol (S.toList $ slrLookahead p)
   makeFirstPoint r SLRPoint{lr0Point=p} h b beta act
     = SLRPoint (makeFirstPoint r p h b beta act) $ follow r (NonTerm h)
   lookaheadMatches p x = S.member x (slrLookahead p)

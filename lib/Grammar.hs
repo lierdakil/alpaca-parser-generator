@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
 module Grammar (
     Symbol(..)
   , Rule(..)
@@ -23,16 +23,19 @@ import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 import Control.Monad.State
 import Control.Monad.Writer.Class
+import MonadTypes
+import Data.Text (Text)
+import qualified Data.Text as T
 
-type Alt = ([Symbol], Maybe String)
-type RulesMap = M.Map String (NonEmpty Alt)
+type Alt = ([Symbol], Maybe Text)
+type RulesMap = M.Map Text (NonEmpty Alt)
 type Rules = NonEmpty Rule
 
-parse :: String -> Rules
-parse = grammar . scan
+parse :: Monad m => Text -> MyMonadT m Rules
+parse = fmap grammar . scan
 
-scan :: String -> [Token]
-scan s = either error id $ runAlex s go
+scan :: Monad m => Text -> MyMonadT m [Token]
+scan s = either (throwError . pure . T.pack) return $ runAlex (T.unpack s) go
   where
   go = do
     tok <- alexMonadScan
@@ -40,10 +43,10 @@ scan s = either error id $ runAlex s go
                 then go
                 else return []
 
-showBody :: [Symbol] -> String
-showBody = unwords . map showSymbol
+showBody :: [Symbol] -> Text
+showBody = T.unwords . map showSymbol
 
-showSymbol :: Symbol -> String
+showSymbol :: Symbol -> Text
 showSymbol TermEof = "%eof"
 showSymbol (Term t) = t
 showSymbol (NonTerm t) = t
@@ -67,7 +70,7 @@ first r = first' S.empty
   first' _ (Term t:_) = S.singleton $ Just (Term t)
   first' _ [] = S.singleton Nothing
 
-isLeftRecursive :: MonadWriter [String] f => RulesMap -> f Bool
+isLeftRecursive :: MonadWriter [Text] f => RulesMap -> f Bool
 isLeftRecursive r = or <$> mapM isRuleLeftRec (M.toList r)
   where
   isRuleLeftRec (h, alts) = or <$> mapM (isBodyLeftRec h . fst) (NE.toList alts)
@@ -78,7 +81,7 @@ isLeftRecursive r = or <$> mapM isRuleLeftRec (M.toList r)
         return True
     | otherwise = return False
 
-  isLeftRec :: String -> [Symbol] -> Bool
+  isLeftRec :: Text -> [Symbol] -> Bool
   isLeftRec nt = first' (S.singleton nt)
     where
     first' seen (NonTerm t:xs)

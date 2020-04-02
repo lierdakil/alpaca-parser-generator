@@ -1,5 +1,7 @@
 {
 module RegexLex where
+import Data.Text (Text)
+import qualified Data.Text as T
 }
 
 %wrapper "monad"
@@ -19,9 +21,9 @@ tokens :-
 <regex>  \?  { mkTok $ const TQuest }
 <regex>  \-  { mkTok $ const TDash }
 <regex>  \|  { mkTok $ const TAlt }
-<regex>  \\. { mkTok $ \(_:c:_) -> TChar c }
+<regex>  \\. { mkTok $ \s -> TChar $ T.index s 1 }
 <regex>  \/$white*  { begin action }
-<regex>  .   { mkTok $ \(c:_) -> TChar c }
+<regex>  .   { mkTok $ \s -> TChar $ T.head s }
 
 <action> .+        { mkTok TAction }
 
@@ -39,10 +41,10 @@ data Token =
   | TAlt
   | TChar Char
   | TEOF
-  | TName String
-  | TAction String
+  | TName Text
+  | TAction Text
   deriving (Eq, Show)
 
 alexEOF = return TEOF
-mkTok f = token $ \(_,_,_,s) len -> f (take len s)
+mkTok f = token $ \(_,_,_,s) len -> f (T.pack $ take len s)
 }
