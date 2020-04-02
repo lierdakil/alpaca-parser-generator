@@ -19,6 +19,8 @@ makeLLParser = buildLLParser . parse
 
 buildLLParser :: Monad m => Rules -> FilePath -> [Symbol] -> MyMonadT m [(FilePath,String)]
 buildLLParser rules basename tokens = do
+  lr <- isLeftRecursive r
+  when lr $ throwError ["LL(1) parser can not handle left-recursive grammar"]
   cells <- mapM (forM tokens . writeCell) nonTerms
   let transTable = intercalate "," . map ((braces . intercalate ",") . map showIdxs) $ cells
   return [

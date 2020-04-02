@@ -6,6 +6,7 @@ module MonadTypes (
   , liftEither
   , tell
   , censor
+  , listen
   ) where
 
 import Control.Monad.Except

@@ -11,6 +11,7 @@ module Grammar (
   , mkRulesMap
   , first
   , follow
+  , isLeftRecursive
   ) where
 
 import GrammarLex
@@ -21,6 +22,7 @@ import Data.Maybe
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 import Control.Monad.State
+import Control.Monad.Writer.Class
 
 type Alt = ([Symbol], Maybe String)
 type RulesMap = M.Map String (NonEmpty Alt)
@@ -64,6 +66,32 @@ first r = first' S.empty
   first' _ (TermEof:_) = S.singleton $ Just TermEof
   first' _ (Term t:_) = S.singleton $ Just (Term t)
   first' _ [] = S.singleton Nothing
+
+isLeftRecursive :: MonadWriter [String] f => RulesMap -> f Bool
+isLeftRecursive r = or <$> mapM isRuleLeftRec (M.toList r)
+  where
+  isRuleLeftRec (h, alts) = or <$> mapM (isBodyLeftRec h . fst) (NE.toList alts)
+
+  isBodyLeftRec h xs
+    | isLeftRec h xs = do
+        tell ["Rule " <> h <> " -> " <> showBody xs <> " is left-recursive."]
+        return True
+    | otherwise = return False
+
+  isLeftRec :: String -> [Symbol] -> Bool
+  isLeftRec nt = first' (S.singleton nt)
+    where
+    first' seen (NonTerm t:xs)
+      | t `S.member` seen = True
+      | Nothing `S.member` first r [NonTerm t]
+      = first'' xs
+      | otherwise = firstT
+      where
+      first'' = first' $ S.insert t seen
+      firstT = any (first'' . fst) $ maybe [] NE.toList $ M.lookup t r
+    first' _ (TermEof:_) = False
+    first' _ (Term _:_) = False
+    first' _ [] = False
 
 follow :: RulesMap -> Symbol -> S.Set Symbol
 follow r t@(NonTerm _) = evalState (follow' t) S.empty

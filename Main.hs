@@ -32,7 +32,8 @@ main = do
     wrap "LALR parser" $ makeLALRParser (unlines grammar) "lalrParser" "ParserLALR" tokens
   return ()
 
-wrap n m = (writeFiles =<< censor (map (("Warning in "<>n<>": ")<>)) m)
-  `catchError`
-  (lift . lift . putStrLn . unlines . map (("Error in "<>n<>": ")<>))
+wrap n m =
+  censor (map (("Warning in "<>n<>": ")<>)) (writeFiles =<< m)
+    `catchError`
+    (tell . map (("Error in "<>n<>": ")<>))
 writeFiles = mapM_ (lift . lift . uncurry writeFile)

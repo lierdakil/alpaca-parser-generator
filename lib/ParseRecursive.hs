@@ -6,6 +6,7 @@ import Data.Maybe
 import Data.List
 import qualified Data.Set as S
 import MonadTypes
+import Control.Monad
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 
@@ -16,6 +17,8 @@ makeParser = makeRecursiveParser . parse
 
 makeRecursiveParser :: Monad m => Rules -> FilePath -> MyMonadT m [(FilePath,String)]
 makeRecursiveParser rules@(Rule h _:|_) basename = do
+  lr <- isLeftRecursive (mkRulesMap rules)
+  when lr $ throwError ["Recursive parser can not handle left-recursive grammar"]
   parsers <- mapM (makeRuleParser actionableRules) rules
   return [(basename <> ".h", "\
 \#ifndef PARSER_H\n\
