@@ -2,7 +2,6 @@
            , TypeFamilies
            , TypeApplications
            , ScopedTypeVariables
-           , TupleSections
            #-}
 module ParseLR (Proxy(..)
   , LRPoint(..)
@@ -51,9 +50,9 @@ pointLeft :: LRPoint a => a -> [Symbol]
 pointLeft = reverse . lr0PointLeft . lr0
 pointRight :: LRPoint a => a -> [Symbol]
 pointRight = lr0PointRight . lr0
-pointAction :: LRPoint a => a -> Maybe ((String, [Symbol]), String)
+pointAction :: LRPoint a => a -> Maybe ((String, [Symbol]), Maybe String)
 pointAction p
-  | null (pointRight p) = ((pointHead p, pointLeft p), ) <$> lr0PointAction (lr0 p)
+  | null (pointRight p) = Just ((pointHead p, pointLeft p), lr0PointAction (lr0 p))
   | otherwise = Nothing
 
 data LR0Point = LR0Point {
@@ -111,7 +110,7 @@ makeLRParser _ input base name tokens
         start = let Rule h _ :| _ = rules in h
         r = mkRulesMap (Rule "%S" (([NonTerm start, TermEof], Nothing) :| []) <| rules)
 
-data Action p = Accept | Shift Word | Reduce ((String, [Symbol]), String) | Reject deriving (Show, Eq, Ord)
+data Action p = Accept | Shift Word | Reduce ((String, [Symbol]), Maybe String) | Reject deriving (Show, Eq, Ord)
 
 writeLRParser :: forall p m. (LRPoint p, Monad m) => FilePath -> String -> [Symbol] -> RulesMap -> LRAutomaton p -> MyMonadT m [(FilePath,String)]
 writeLRParser base name tokens r t = do
@@ -207,7 +206,7 @@ writeLRParser base name tokens r t = do
     \stack.push("<> show st <>");\
     \a = lex->getNextToken();\
   \"
-  actionBody (Reduce ((h, body), code)) = "{"
+  actionBody (Reduce ((h, body), mcode)) = "{"
     <> "if(debug) std::cerr << \"Reduce using "<> h <>" -> "<>showBody body<>";\\n\";"
     <> concat (reverse $ zipWith showArg body [1::Word ..])
     <> "auto gt = " <> goto <> ";"
@@ -217,7 +216,11 @@ writeLRParser base name tokens r t = do
     <> "stack.push({gt,"<>result<>"});"
     <> "}"
     where
-      result = "([]("<>argDefs<>") {" <> code <> "})("<>args<>")"
+      result
+        | Just code <- mcode
+        = "([]("<>argDefs<>") {" <> code <> "})("<>args<>")"
+        | otherwise
+        = "ResultType()"
       goto = "GOTO[top()]["<>show (nonTermIdx h)<>"/*"<>h<>"*/]"
       argDefs = intercalate "," $ zipWith showArgDef body [1::Word ..]
       args = intercalate "," $ zipWith showCallArg body [1::Word ..]
