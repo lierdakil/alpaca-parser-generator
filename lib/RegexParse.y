@@ -2,7 +2,7 @@
 module RegexParse where
 
 import RegexLex
-import qualified Data.List.NonEmpty as NE
+import Data.List.NonEmpty (NonEmpty(..))
 }
 
 %name regex
@@ -75,7 +75,7 @@ CRng
   | Rng  { $1 }
 
 Grp
-  : CRng GrpCont  { $1 NE.:| $2 }
+  : CRng GrpCont  { $1 :| $2 }
 
 GrpCont
   : CRng GrpCont { $1 : $2 }
@@ -94,7 +94,7 @@ data CharPattern =
   deriving (Show, Eq, Ord)
 
 data RegexPatternSingle =
-    PGroup (NE.NonEmpty CharPattern)
+    PGroup (NonEmpty CharPattern)
   | PKleene RegexPattern
   | PPositive RegexPattern
   | PMaybe RegexPattern

@@ -14,12 +14,12 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
+import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 import Data.List
 import Data.Maybe
 import Control.Monad.State
 import Control.Arrow
-import Data.Function
 
 type StateAttr = S.Set (Maybe String, Action)
 type NFA = IM.IntMap (StateAttr, M.Map (Maybe (NE.NonEmpty CharPattern)) [Int])
@@ -113,9 +113,8 @@ simplifyDFA dfa = IM.fromList $ mapMaybe simpDFA lst
     | otherwise = st
   equalStates =
       IM.fromList
-    . concatMap (\(x:xs) -> map ((, fst x) . fst) xs)
-    . groupBy ((==) `on` snd)
-    . sortOn snd
+    . concatMap (\(x:|xs) -> map ((, fst x) . fst) xs)
+    . NE.groupAllWith snd
     $ lst
 
 nfaToDFA :: NFA -> DFA

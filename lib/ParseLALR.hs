@@ -2,6 +2,7 @@
            , TypeApplications
            , GeneralizedNewtypeDeriving
            , UndecidableInstances
+           , FlexibleContexts
            #-}
 module ParseLALR (makeLALRParser) where
 
@@ -9,46 +10,54 @@ import Grammar
 import ParseLR
 import qualified Data.Set as S
 import qualified Data.Map as M
-import Data.Function
 import Data.List
 import Data.Maybe
 import Data.List.NonEmpty (NonEmpty(..), (<|))
+import qualified Data.List.NonEmpty as NE
 import MonadTypes
 
 makeLALRParser :: (Monad m)
              => String -> FilePath -> String -> [Symbol]
              -> MyMonadT m [(FilePath,String)]
 makeLALRParser input base name tokens
-  = writeLRParser base name tokens r . lalrify $ buildLRAutomaton @LR1Point start r
+  = do
+    automaton <- lalrify $ buildLRAutomaton @LR1Point start r
+    writeLRParser base name tokens r automaton
   where rules = parse input
         start = let Rule h _ :| _ = rules in h
         r = mkRulesMap (Rule "%S" (([NonTerm start], Nothing) :| []) <| rules)
 
-lalrify :: LRAutomaton LR1Point -> LRAutomaton LALRPoint
-lalrify t = (lookup' (fst t), M.fromListWith checkSame . map conv $ tl)
+lalrify :: Monad m => LRAutomaton LR1Point -> MyMonadT m (LRAutomaton LALRPoint)
+lalrify t = (,) (lookup' (fst t)) . M.fromAscList <$> mapM ensureUnique (NE.groupAllWith fst (map conv tl))
   where
+    ensureUnique (x :| []) = return x
+    ensureUnique ((k,x) :| xs)
+      = if all ((==x) . snd) xs
+        then return (k, x)
+        else do
+          tell $ "While building LALR automaton, state "<>show k<>" became \
+                 \ non-deterministic:"
+                 : map show (x:map snd xs)
+          tell [ "Will use " <> show x ]
+          return (k, x)
     conv ((stk, x), stv) = ((lookup' stk, x), lookup' stv)
     lookup' x = fromJust $ M.lookup (lr0s x) gstates
     states = fst t : S.toList (S.fromList $ map snd tl)
-    gstates = M.fromListWith (error . show)
+    gstates = M.fromList -- each key is unique due to grouping
       . map mkLalr
-      . groupBy ((==) `on` S.map lr0)
-      . sortBy (compare `on` S.map lr0)
+      . NE.groupAllWith (S.map lr0)
       $ states
-    mkLalr :: [LRState LR1Point] -> (LRState LR0Point, LRState LALRPoint)
-    mkLalr xs = (S.map lr0 (head xs), combined $ map S.toList xs)
-      where combined :: [[LR1Point]] -> S.Set LALRPoint
-            combined = S.fromList . map combine . transpose
-            combine ps@(p1:_) = LALRPoint $ p1{
-              lr1PointLookahead = S.unions (map lr1PointLookahead ps)
+    mkLalr :: NonEmpty (LRState LR1Point) -> (LRState LR0Point, LRState LALRPoint)
+    mkLalr (x :| xs) = (S.map lr0 x, combined (x:|xs))
+      where combined :: NonEmpty (S.Set LR1Point) -> S.Set LALRPoint
+            combined = S.fromList . map combine . transpose' . NE.map S.toList
+            combine (p1:|ps) = LALRPoint $ p1{
+              lr1PointLookahead = S.unions (map lr1PointLookahead (p1:ps))
             }
-            combine [] = error "x_X"
+            transpose' :: NonEmpty [a] -> [NonEmpty a]
+            transpose' = map NE.fromList . transpose . NE.toList
     tl = M.toList (snd t)
     lr0s = S.map lr0
-
-checkSame :: LRState LALRPoint -> LRState LALRPoint -> LRState LALRPoint
-checkSame a b = if a==b then a
-                else error "not same"
 
 newtype LALRPoint = LALRPoint {
     lr1Point :: LR1Point

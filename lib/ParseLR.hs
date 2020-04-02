@@ -23,7 +23,6 @@ import Data.Maybe
 import Data.List
 import Data.Void
 import Data.Char
-import Data.Function
 import Data.Proxy
 import MonadTypes
 import Control.Monad.State
@@ -285,8 +284,8 @@ printTable r t = --show t
 pointClosure :: LRPoint a => RulesMap -> S.Set a -> S.Set a
 pointClosure r = unify . flip evalState S.empty . fmap S.unions . mapM doAdd . S.toList
   where
-  unify = S.fromList . map combine . NE.groupBy ((==) `on` lr0) . sortBy (compare `on` lr0) . S.toList
-  combine (x NE.:| xs) = modLookahead x (S.unions $ map pointLookahead (x:xs))
+  unify = S.fromList . map combine . NE.groupAllWith lr0 . S.toList
+  combine (x :| xs) = modLookahead x (S.unions $ map pointLookahead (x:xs))
   doAdd p | (NonTerm nt:beta) <- pointRight p = do
     seen <- gets (S.member p)
     if not seen
