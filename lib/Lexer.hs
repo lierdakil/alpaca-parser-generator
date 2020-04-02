@@ -1,7 +1,8 @@
-{-# LANGUAGE TupleSections #-}
-module Lexer (makeLexer, Lang(..)) where
+{-# LANGUAGE TupleSections, FlexibleContexts #-}
+module Lexer (makeDFA, writeLexer, Lang(..)) where
 
 import qualified Data.Map as M
+import qualified Data.Set as S
 import Control.Monad.State
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
@@ -13,13 +14,16 @@ import RegexParse
 import RegexLex (alexMonadScan, runAlex, Token(..))
 import Grammar (Symbol(..))
 import FA
+import MonadTypes
+import Control.Monad.Except
+import Control.Monad.Writer
 
 newState :: State Int Int
 newState = state $ \s -> (s+1, s+1)
 
 nonAcc :: M.Map (Maybe (NE.NonEmpty CharPattern)) [Int]
        -> (StateAttr, M.Map (Maybe (NE.NonEmpty CharPattern)) [Int])
-nonAcc = (,) []
+nonAcc = (,) S.empty
 
 regex1ToNFASt :: RegexPatternSingle -> State Int NFA
 regex1ToNFASt (PGroup ch) = do
@@ -80,7 +84,7 @@ regexToNFA :: (Maybe String, Action) -> RegexPattern -> State Int NFA
 regexToNFA (name, action) pat = do
   res1 <- regexToNFASt pat
   lastSt <- get
-  return $ IM.insertWith mapUnion lastSt ([(name, action)], M.empty) res1
+  return $ IM.insertWith mapUnion lastSt (S.singleton (name, action), M.empty) res1
 
 build1NFA :: RegexDef -> State Int NFA
 build1NFA (RegexDef mbname pat mbact) = regexToNFA (mbname, mbact) pat
@@ -101,16 +105,15 @@ scanLine s = runAlex s go
 
 data Lang = CPP
 
-makeLexer :: [String] -> Lang -> Either String ([Symbol], [(FilePath, String)])
-makeLexer input lang = do
-  defs <- mapM (fmap regex . scanLine) input
+makeDFA :: Monad m => [String] -> MyMonadT m ([(FilePath, String)], DFA)
+makeDFA input = do
+  defs <- liftEither $ mapM (fmap regex . scanLine) input
   let nfa = evalState (buildNFA defs) 0
       dfa = simplifyDFA . nfaToDFA $ nfa
       debug = [("nfa.gv", nfaToGraphviz nfa), ("dfa.gv", dfaToGraphviz dfa)]
-  (tokens, code) <- writeLexer dfa lang
-  return (tokens, debug <> code)
+  return (debug, dfa)
 
-writeLexer :: DFA -> Lang -> Either String ([Symbol], [(FilePath, String)])
+writeLexer :: Monad m => DFA -> Lang -> MyMonadT m ([Symbol], [(FilePath, String)])
 writeLexer dfa CPP = do
   accSt <- catMaybes <$> mapM (\(f, (s, _)) -> fmap (f,) <$> isSingle f s) stList
   let accStS = IS.fromList $ map fst accSt
@@ -134,7 +137,7 @@ writeLexer dfa CPP = do
 \#define LEXER_H\n\
 \#include <string>\n\
 \enum class TokenType : std::size_t { eof, " <> intercalate "," (map ("Tok_"<>) tokNames) <> "};\
-\const char* to_string(TokenType tt);\
+\const std::string to_string(TokenType tt);\
 \\n\
 \#if __has_include(\"token.h\")\n\
 \#include \"token.h\"\n\
@@ -151,7 +154,7 @@ writeLexer dfa CPP = do
   \std::string::const_iterator endIx;\
   \const bool debug;\
 \public:\
-  \Lexer(const std::string &input, bool debug=false);\
+  \Lexer(const std::string &input, bool debug);\
   \Token getNextToken();\
 \};\n\
 \#endif\n")
@@ -159,7 +162,7 @@ writeLexer dfa CPP = do
 \#include \"lexer.h\"\n\
 \#include <stdexcept>\n\
 \#include <iostream>\n\
-\const char* to_string(TokenType tt){\
+\const std::string to_string(TokenType tt){\
 \static constexpr const char *names[] = {" <> tokReflect <> " };\
 \return names[static_cast<std::size_t>(tt)];\
 \}\
@@ -197,9 +200,12 @@ writeLexer dfa CPP = do
       \goto start;"
   mkAct NoAction = ""
   mkAct (Action act) = "," <> act
-  isSingle _ [] = return Nothing
-  isSingle _ [x] = return $ Just x
-  isSingle f xs = fail $ "Lexer: Multiple actions/tokens match the same state " <> show f <> ": " <> show xs
+  isSingle f xs
+    | S.null xs = return Nothing
+    | S.size xs == 1 = return $ Just (S.findMin xs)
+    | otherwise = do
+        tell ["Lexer: Multiple actions/tokens match the same state " <> show f <> ": " <> show xs <> ". Choosing the first option."]
+        return (Just $ S.findMin xs)
   checkChars (charGroup, newSt) = "if(" <> charCond charGroup <> ") goto state_" <> show newSt <> ";"
   charCond = intercalate "||" . map charCond1 . NE.toList
   charCond1 (CChar c) = "curCh == " <> show c

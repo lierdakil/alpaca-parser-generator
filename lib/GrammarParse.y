@@ -2,6 +2,7 @@
 module GrammarParse where
 
 import GrammarLex
+import Data.List.NonEmpty (NonEmpty(..))
 }
 
 %name grammar
@@ -29,11 +30,11 @@ Rules
   | Rule       { [$1] }
 
 Rule
-  : nont '->' Alternatives ';' { Rule $1 (reverse $3) }
+  : nont '->' Alternatives ';' { Rule $1 ($3 []) }
 
 Alternatives
-  : Alternatives '|' BodyWithAction { $3:$1 }
-  | BodyWithAction                  { [$1] }
+  : Alternatives '|' BodyWithAction { $1 . ($3 :) }
+  | BodyWithAction                  { ($1 :|) }
 
 BodyWithAction
   : Body Action           { (reverse $1, $2) }
@@ -53,7 +54,7 @@ Symbol
 
 {
 data Symbol = TermEof | Term String | NonTerm String deriving (Eq, Ord, Show)
-data Rule = Rule String [([Symbol], Maybe String)] deriving (Eq, Show)
+data Rule = Rule String (NonEmpty ([Symbol], Maybe String)) deriving (Eq, Show)
 
 parseError :: [Token] -> a
 parseError x = error $ "Parse error at" <> show x

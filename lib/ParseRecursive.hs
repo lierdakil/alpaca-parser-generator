@@ -5,68 +5,80 @@ import Grammar
 import Data.Maybe
 import Data.List
 import qualified Data.Set as S
+import MonadTypes
+import Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.List.NonEmpty as NE
 
 type ActionableRules = S.Set String
 
-makeParser :: String -> String
+makeParser :: Monad m => String -> FilePath -> MyMonadT m [(FilePath,String)]
 makeParser = makeRecursiveParser . parse
 
-makeRecursiveParser :: [Rule] -> String
-makeRecursiveParser [] = error "No rules!"
-makeRecursiveParser rules@(Rule h _:_)= "\
+makeRecursiveParser :: Monad m => [Rule] -> FilePath -> MyMonadT m [(FilePath,String)]
+makeRecursiveParser [] _ = throwError "No rules!"
+makeRecursiveParser rules@(Rule h _:_) basename = do
+  parsers <- mapM (makeRuleParser actionableRules) rules
+  return [(basename <> ".h", "\
 \#ifndef PARSER_H\n\
 \#define PARSER_H\n\
-\#include <stdexcept>\n\
-\#include <iostream>\n\
 \#include \"lexer.h\"\n\
 \#include \"parseResult.h\"\n\
 \class Parser {\
   \Lexer *lex;\
   \Token curTok;\
   \bool debug;\
-\"<> parsers <> "\
+\"<> concatMap fst parsers <> "\
 \public:\
-  \Parser(Lexer *lex, bool debug = false):lex(lex),debug(debug)\
-  \{curTok = lex->getNextToken();}\
-  \"<>returnType<>" parse() { return parse_"<>h<>"(); } \
+  \Parser(Lexer *lex, bool debug);\
+  \"<>returnType<>" parse();\
 \};\n\
-\#endif\n"
+\#endif\n")
+    ,(basename <> ".cpp", "\
+\#include \""<>basename<>".h\"\n\
+\#include <stdexcept>\n\
+\#include <iostream>\n\
+\Parser::Parser(Lexer *lex, bool debug = false):lex(lex),debug(debug){\
+  \curTok = lex->getNextToken();\
+\}\
+\"<>returnType<>" Parser::parse() { return parse_"<>h<>"(); }\
+\"<>concatMap snd parsers<>"\
+\")]
   where
   returnType | h `S.member` actionableRules = "ResultType"
              | otherwise = "void"
-  parsers = concatMap (makeRuleParser actionableRules) rules
   actionableRules = S.fromList $ map (\(Rule k _ ) -> k)
                     $ filter (\(Rule _ as) -> all (isJust . snd) as) rules
 
-makeRuleParser :: ActionableRules -> Rule -> String
-makeRuleParser ars (Rule h a) = "\
-\"<>returnType<>" parse_"<>h<>"() {\
-\" <> buildAlternatives ars h a <> "\
-\}\
-\"
+makeRuleParser :: Monad m => ActionableRules -> Rule -> MyMonadT m (String, String)
+makeRuleParser ars (Rule h a) = do
+  alts <- buildAlternatives ars h a
+  return (
+      returnType <>" parse_"<>h<>"();"
+    , returnType <>" Parser::parse_"<>h<>"() {" <> alts <> "}"
+    )
   where returnType | h `S.member` ars = "ResultType"
                    | otherwise        = "void"
 
-buildAlternatives :: ActionableRules -> String -> [Alt] -> String
-buildAlternatives ars h [(x, act)] = printDebug h x <> buildBody ars (zip [1..] x) <> buildAction act
-buildAlternatives _ _ [] = error "impossiburu"
-buildAlternatives ars h xs = intercalate " else " (map (buildAlt ars h) xs) <> err
+buildAlternatives :: Monad m => ActionableRules -> String -> NE.NonEmpty Alt -> MyMonadT m String
+buildAlternatives ars h ((x, act) :| []) = return $ printDebug h x <> buildBody ars (zip [1..] x) <> buildAction act
+buildAlternatives ars h xs = (<> err) . intercalate " else " <$> mapM (buildAlt ars h) xs'
   where
-  err | Just _ <- lookup [] xs = "" -- there is an else case
+  xs' = NE.toList xs
+  err | Just _ <- lookup [] xs' = "" -- there is an else case
       | otherwise
       = "else { throw std::runtime_error(\"No alternative matched while parsing nonterminal "<>h<>":\" + to_string(curTok.type)); }"
 
 printDebug :: String -> [Symbol] -> String
 printDebug h b = "if (debug) std::cerr << \"" <> h <> " -> " <> showBody b <> "\" << std::endl;"
 
-buildAlt :: ActionableRules -> String -> Alt -> String
-buildAlt _ h ([], act) = "{" <> printDebug h [] <> buildAction act <> "}"
-buildAlt ars h (Term s:b, act) = "if(curTok.type == TokenType::Tok_"<>s<>"){\
+buildAlt :: Monad m => ActionableRules -> String -> Alt -> MyMonadT m String
+buildAlt _ h ([], act) = return $ "{" <> printDebug h [] <> buildAction act <> "}"
+buildAlt ars h (Term s:b, act) = return $ "if(curTok.type == TokenType::Tok_"<>s<>"){\
   \"<> printDebug h (Term s:b) <> "\
   \auto _1 = curTok; curTok = lex->getNextToken();"
   <> buildBody ars (zip [2..] b) <> buildAction act
   <> "}"
-buildAlt _ h (b, _) = error $ "Can not handle body " <> h <> " -> " <> showBody b
+buildAlt _ h (b, _) = throwError $ "Recursive parser can not handle body " <> h <> " -> " <> showBody b
 
 buildAction :: Maybe String -> String
 buildAction Nothing = ""

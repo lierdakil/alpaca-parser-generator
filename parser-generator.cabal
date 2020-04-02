@@ -25,6 +25,7 @@ library
                      , ParseLR
                      , ParseSLR
                      , ParseLALR
+                     , MonadTypes
   other-modules:       RegexLex
                      , RegexParse
                      , GrammarLex
@@ -45,6 +46,7 @@ executable parser-generator
   -- other-extensions:
   build-depends:       base >=4.12 && <4.13
                      , parser-generator
-                     , mtl
+                     , directory
+                     , filepath
   -- hs-source-dirs:
   default-language:    Haskell2010

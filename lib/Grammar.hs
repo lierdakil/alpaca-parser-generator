@@ -18,10 +18,11 @@ import GrammarParse
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Maybe
+import qualified Data.List.NonEmpty as NE
 import Control.Monad.State
 
 type Alt = ([Symbol], Maybe String)
-type RulesMap = M.Map String [Alt]
+type RulesMap = M.Map String (NE.NonEmpty Alt)
 type Rules = [Rule]
 
 parse :: String -> [Rule]
@@ -49,17 +50,19 @@ mkRulesMap = M.fromList . map ruleToTuple
   where ruleToTuple (Rule h alts) = (h, alts)
 
 first :: RulesMap -> [Symbol] -> S.Set (Maybe Symbol)
-first r = first'
+first r = first' S.empty
   where
-  first' (NonTerm t:xs)
+  first' seen (NonTerm t:xs)
+    | t `S.member` seen = S.empty
     | Nothing `S.member` firstT
-    = S.delete Nothing firstT `S.union` first r (filter (/= NonTerm t) xs)
+    = S.delete Nothing firstT `S.union` first'' xs
     | otherwise = firstT
     where
-    firstT = S.unions (map (first' . fst) $ fromMaybe [] $ M.lookup t r)
-  first' (TermEof:_) = S.singleton $ Just TermEof
-  first' (Term t:_) = S.singleton $ Just (Term t)
-  first' [] = S.singleton Nothing
+    first'' = first' $ S.insert t seen
+    firstT = S.unions (map (first'' . fst) $ maybe [] NE.toList $ M.lookup t r)
+  first' _ (TermEof:_) = S.singleton $ Just TermEof
+  first' _ (Term t:_) = S.singleton $ Just (Term t)
+  first' _ [] = S.singleton Nothing
 
 follow :: RulesMap -> Symbol -> S.Set Symbol
 follow r t@(NonTerm _) = evalState (follow' t) S.empty

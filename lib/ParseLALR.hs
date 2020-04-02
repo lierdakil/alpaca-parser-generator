@@ -12,12 +12,13 @@ import qualified Data.Map as M
 import Data.Function
 import Data.List
 import Data.Maybe
+import Data.List.NonEmpty (NonEmpty(..))
 
 makeLALRParser :: String -> [Symbol] -> String -> String
 makeLALRParser name tokens input = writeLRParser name tokens r . lalrify $ buildLRAutomaton @LR1Point start r
   where rules = parse input
         start = let Rule h _ : _ = rules in h
-        r = mkRulesMap (Rule "%S" [([NonTerm start], Nothing)] : rules)
+        r = mkRulesMap (Rule "%S" (([NonTerm start], Nothing) :| []) : rules)
 
 lalrify :: LRAutomaton LR1Point -> LRAutomaton LALRPoint
 lalrify t = (lookup' (fst t), M.fromListWith checkSame . map conv $ tl)

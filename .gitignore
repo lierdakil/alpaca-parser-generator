@@ -1,7 +1,5 @@
 /.ccls-cache
-/*.xy
-/*.h
-/*.cpp
+/test
 /dist
 /dist-newstyle
 /a.out

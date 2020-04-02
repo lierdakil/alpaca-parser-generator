@@ -17,6 +17,8 @@ module ParseLR (Proxy(..)
 import Grammar
 import qualified Data.Set as S
 import qualified Data.Map as M
+import Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.List.NonEmpty as NE
 import Data.Maybe
 import Data.List
 import Data.Void
@@ -104,7 +106,7 @@ makeLRParser :: forall p. LRPoint p => Proxy p -> String -> [Symbol] -> String -
 makeLRParser _ name tokens input = writeLRParser name tokens r $ buildLRAutomaton @p start r
   where rules = parse input
         start = let Rule h _ : _ = rules in h
-        r = mkRulesMap (Rule "%S" [([NonTerm start, TermEof], Nothing)] : rules)
+        r = mkRulesMap (Rule "%S" (([NonTerm start, TermEof], Nothing) :| []) : rules)
 
 data Action p = Accept | Shift Word | Reduce ((String, [Symbol]), String) | Reject deriving (Show, Eq, Ord)
 
@@ -282,7 +284,7 @@ pointClosure r = unify . flip evalState S.empty . fmap S.unions . mapM doAdd . S
     then do
       modify (S.insert p)
       let Just alts = M.lookup nt r
-          new = map (\(b, act) -> makeFirstPoint r p nt b beta act) alts
+          new = map (\(b, act) -> makeFirstPoint r p nt b beta act) $ NE.toList alts
       S.union (S.fromList (p : new)) . S.unions <$> mapM doAdd new
     else return S.empty
   doAdd x = return (S.singleton x)

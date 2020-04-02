@@ -11,17 +11,17 @@ module FA (
 
 import RegexParse (Action, CharPattern(..))
 import qualified Data.Map as M
+import qualified Data.Set as S
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import qualified Data.List.NonEmpty as NE
 import Data.List
 import Data.Maybe
 import Control.Monad.State
-import Control.Applicative
 import Control.Arrow
 import Data.Function
 
-type StateAttr = [(Maybe String, Action)]
+type StateAttr = S.Set (Maybe String, Action)
 type NFA = IM.IntMap (StateAttr, M.Map (Maybe (NE.NonEmpty CharPattern)) [Int])
 type DFA = IM.IntMap (StateAttr, M.Map (NE.NonEmpty CharPattern) Int)
 
@@ -30,7 +30,7 @@ nfaToGraphviz fa = "digraph{rankdir=LR;" <> concatMap node l <> "}"
   where l = IM.toList fa
         node (i, (a, t)) = show i <> "[label=\""<> intercalate "/" lbl <>"\"" <> acc <> "];"
                                   <> concatMap (trans i) (M.toList t)
-                           where lbl = mapMaybe fst a
+                           where lbl = mapMaybe fst $ S.toList a
                                  acc = if not $ null lbl then ", peripheries=2" else ""
         trans i (c, ss) = concatMap (\s -> show i <> " -> " <> show s <> "[label=\""<> showCharPattern c<>"\"];") ss
 
@@ -39,7 +39,7 @@ dfaToGraphviz fa = "digraph{rankdir=LR;" <> concatMap node l <> "}"
   where l = IM.toList fa
         node (i, (a, t)) = show i <> "[label=\""<> intercalate "/" lbl <>"\"" <> acc <> "];"
                                   <> concatMap (trans i) (M.toList t)
-                           where lbl = mapMaybe fst a
+                           where lbl = mapMaybe fst $ S.toList a
                                  acc = if not $ null lbl then ", peripheries=2" else ""
         trans i (c, ss) = (\s -> show i <> " -> " <> show s <> "[label=\""<> showCharPattern (Just c)<>"\"];") ss
 
@@ -87,7 +87,7 @@ ecls nfa st = (accs, IS.fromList stl)
   stl = snd $ ecls' st
   -- ecls' :: [Int] -> (Bool, [Int])
   ecls' arg = let res = map ecls1 arg
-                  acc = concatMap fst res
+                  acc = S.unions $ map fst res
                   sts = concatMap snd res
               in (acc, sts)
   -- ecls1 :: Int -> (Bool, [Int])
@@ -95,8 +95,8 @@ ecls nfa st = (accs, IS.fromList stl)
     | Just (acc, trans) <- IM.lookup st2 nfa
     = let newst = concat . maybeToList $ M.lookup Nothing trans
           (restacc, rest) = ecls' newst
-      in (acc <|> restacc, st2:newst <> rest)
-    | otherwise = ([], [])
+      in (acc <> restacc, st2:newst <> rest)
+    | otherwise = (S.empty, [])
 
 simplifyDFA :: DFA -> DFA
 simplifyDFA dfa = IM.fromList $ mapMaybe simpDFA lst
