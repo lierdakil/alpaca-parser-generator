@@ -3,6 +3,7 @@ module MonadTypes (
   , throwError
   , catchError
   , lift
+  , liftEither
   , tell
   ) where
 

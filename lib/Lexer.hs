@@ -15,8 +15,6 @@ import RegexLex (alexMonadScan, runAlex, Token(..))
 import Grammar (Symbol(..))
 import FA
 import MonadTypes
-import Control.Monad.Except
-import Control.Monad.Writer
 
 newState :: State Int Int
 newState = state $ \s -> (s+1, s+1)
@@ -132,20 +130,25 @@ writeLexer dfa CPP = do
         <> intercalate " else " (foldr ((:) . checkChars) [] charTrans)
         <> "goto end;"
       transTable = concatMap checkState stList
-  return $ (,) terminals [("lexer.h", "\
+  return $ (,) terminals [
+      ( "tokenType.h"
+      , "#ifndef TOKEN_TYPE_H\n#define TOKEN_TYPE_H\n"
+        <> "enum class TokenType : std::size_t { eof, "
+        <> intercalate "," (map ("Tok_"<>) tokNames)
+        <> "};"
+        <> "\n#endif\n"
+      )
+    , ("lexer.h", "\
 \#ifndef LEXER_H\n\
 \#define LEXER_H\n\
 \#include <string>\n\
-\enum class TokenType : std::size_t { eof, " <> intercalate "," (map ("Tok_"<>) tokNames) <> "};\
-\const std::string to_string(TokenType tt);\
-\\n\
+\#include \"tokenType.h\"\n\
+\const std::string to_string(TokenType tt);\n\
 \#if __has_include(\"token.h\")\n\
 \#include \"token.h\"\n\
 \#else\n\
 \struct Token{TokenType type; std::string text;};\
-\Token mkToken(TokenType type, const std::string_view &text = \"\") {\
-  \return Token{type, std::string(text)};\
-\}\n\
+\Token mkToken(TokenType type, const std::string_view &text = \"\");\n\
 \#endif\n\
 \class Lexer {\
   \const std::string _input;\
@@ -165,7 +168,13 @@ writeLexer dfa CPP = do
 \const std::string to_string(TokenType tt){\
 \static constexpr const char *names[] = {" <> tokReflect <> " };\
 \return names[static_cast<std::size_t>(tt)];\
-\}\
+\}\n\
+\#if __has_include(\"token.h\")\n\
+\#else\n\
+\Token mkToken(TokenType type, const std::string_view &text) {\
+  \return Token{type, std::string(text)};\
+\}\n\
+\#endif\n\
 \Lexer::Lexer(const std::string &input, bool debug=false) \
 \: _input(input), input(_input), curChIx(input.cbegin()), endIx(input.cend()), debug(debug) {}\
 \Token Lexer::getNextToken() {\
