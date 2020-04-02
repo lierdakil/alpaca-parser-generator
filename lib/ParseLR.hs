@@ -149,6 +149,14 @@ writeLRParser base name tokens r t = do
   \#include \""<>base<>".h\"\n\
   \#include <stdexcept>\n\
   \#include <iostream>\n\
+  \static const std::string stateToString(std::size_t state) {\
+    \static constexpr const char* names[] = {"<>intercalate "," stateToSym<>"};\
+    \return names[state];\
+  \}\
+  \static const std::string expectedSym(std::size_t state) {\
+    \static constexpr const char* names[] = {"<>intercalate "," expectedSymbols<>"};\
+    \return names[state];\
+  \}\
   \const std::size_t "<>name<>"::Action["<>show (length states)<>"]["
     <>show (length tokens)<>"] = {" <> actionTable <> "};\
   \const std::size_t "<>name<>"::GOTO["<>show (length states)<>"]["
@@ -201,10 +209,15 @@ writeLRParser base name tokens r t = do
   writeAction (a, n) = "case " <> show n <> ": "
     <> actionBody a
     <> "break;"
-  actionBody Reject = "throw std::runtime_error(\
-      \\"Rejection state reached when encoutered symbol \" \
-      \+ ::to_string(a.type) + \" in state \" \
-      \+ std::to_string(top()));"
+  actionBody Reject = "{\
+      \std::string parsed=stateToString(top());\
+      \auto lastSt = top();\
+      \while(!stack.empty()) { stack.pop(); parsed = stateToString(top()) + \" \" + parsed; }\
+      \throw std::runtime_error(\
+      \\"Rejection state reached after parsing \\\"\"+parsed+\"\\\", when encoutered symbol \\\"\" \
+      \+ ::to_string(a.type) + \"\\\" in state \" \
+      \+ std::to_string(lastSt) + \". Expected \\\"\" + expectedSym(lastSt) +\"\\\"\");\
+      \}"
   actionBody (Shift st) = "\
     \stack.push("<> show st <>");\
     \a = lex->getNextToken();\
@@ -243,6 +256,21 @@ writeLRParser base name tokens r t = do
   nonTerminals = nub $ mapMaybe (isNonTerm . snd) $ M.keys (snd t)
   isNonTerm (NonTerm x) = Just x
   isNonTerm _ = Nothing
+  expectedSymbols = map expected states
+    where
+      expected st
+        = quote $ intercalate "/" $ map next $ S.toList st
+      next st
+        | (x:_) <- pointRight st = showSymbol x
+        | otherwise = showLookahead st
+  stateToSym = map sym states
+    where
+      sym st
+        | Just el <- S.lookupMin $ S.filter (not . null . pointLeft) st
+        = quote $ showSymbol $ last (pointLeft el)
+        | otherwise
+        = quote "·"
+  quote x = '"':x <> "\""
   statesMapList = zip states [0::Word ..]
   statesMap = M.fromList statesMapList
   allReductions = nub $ concatMap getReduction states
