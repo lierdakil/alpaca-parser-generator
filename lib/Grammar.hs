@@ -23,9 +23,9 @@ import Control.Monad.State
 
 type Alt = ([Symbol], Maybe String)
 type RulesMap = M.Map String (NE.NonEmpty Alt)
-type Rules = [Rule]
+type Rules = NE.NonEmpty Rule
 
-parse :: String -> [Rule]
+parse :: String -> Rules
 parse = grammar . scan
 
 scan :: String -> [Token]
@@ -46,7 +46,7 @@ showSymbol (Term t) = t
 showSymbol (NonTerm t) = t
 
 mkRulesMap :: Rules -> RulesMap
-mkRulesMap = M.fromList . map ruleToTuple
+mkRulesMap = M.fromList . map ruleToTuple . NE.toList
   where ruleToTuple (Rule h alts) = (h, alts)
 
 first :: RulesMap -> [Symbol] -> S.Set (Maybe Symbol)

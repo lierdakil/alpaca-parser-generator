@@ -23,11 +23,11 @@ import Data.List.NonEmpty (NonEmpty(..))
 %%
 
 Start
-  : Rules eof  { reverse $1 }
+  : Rules eof  { $1 [] }
 
 Rules
-  : Rules Rule { $2:$1 }
-  | Rule       { [$1] }
+  : Rules Rule { $1 . ($2 :) }
+  | Rule       { ($1 :|) }
 
 Rule
   : nont '->' Alternatives ';' { Rule $1 ($3 []) }

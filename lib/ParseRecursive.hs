@@ -14,9 +14,8 @@ type ActionableRules = S.Set String
 makeParser :: Monad m => String -> FilePath -> MyMonadT m [(FilePath,String)]
 makeParser = makeRecursiveParser . parse
 
-makeRecursiveParser :: Monad m => [Rule] -> FilePath -> MyMonadT m [(FilePath,String)]
-makeRecursiveParser [] _ = throwError ["No rules!"]
-makeRecursiveParser rules@(Rule h _:_) basename = do
+makeRecursiveParser :: Monad m => Rules -> FilePath -> MyMonadT m [(FilePath,String)]
+makeRecursiveParser rules@(Rule h _:|_) basename = do
   parsers <- mapM (makeRuleParser actionableRules) rules
   return [(basename <> ".h", "\
 \#ifndef PARSER_H\n\
@@ -47,7 +46,8 @@ makeRecursiveParser rules@(Rule h _:_) basename = do
   returnType | h `S.member` actionableRules = "ResultType"
              | otherwise = "void"
   actionableRules = S.fromList $ map (\(Rule k _ ) -> k)
-                    $ filter (\(Rule _ as) -> all (isJust . snd) as) rules
+                    $ filter (\(Rule _ as) -> all (isJust . snd) as)
+                    $ NE.toList rules
 
 makeRuleParser :: Monad m => ActionableRules -> Rule -> MyMonadT m (String, String)
 makeRuleParser ars (Rule h a) = do

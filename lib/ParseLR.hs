@@ -17,7 +17,7 @@ module ParseLR (Proxy(..)
 import Grammar
 import qualified Data.Set as S
 import qualified Data.Map as M
-import Data.List.NonEmpty (NonEmpty(..))
+import Data.List.NonEmpty (NonEmpty(..), (<|))
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe
 import Data.List
@@ -109,8 +109,8 @@ makeLRParser :: forall p m. (LRPoint p, Monad m)
 makeLRParser _ input base name tokens
   = writeLRParser base name tokens r $ buildLRAutomaton @p start r
   where rules = parse input
-        start = let Rule h _ : _ = rules in h
-        r = mkRulesMap (Rule "%S" (([NonTerm start, TermEof], Nothing) :| []) : rules)
+        start = let Rule h _ :| _ = rules in h
+        r = mkRulesMap (Rule "%S" (([NonTerm start, TermEof], Nothing) :| []) <| rules)
 
 data Action p = Accept | Shift Word | Reduce ((String, [Symbol]), String) | Reject deriving (Show, Eq, Ord)
 

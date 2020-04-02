@@ -8,6 +8,7 @@ import qualified Data.Set as S
 import qualified Data.Map as M
 import Text.Layout.Table
 import Control.Monad
+import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 import MonadTypes
 
@@ -118,7 +119,7 @@ buildLLParser rules basename tokens = do
   r2t ((nt, b), (ts, act)) = map (\term -> ((nt, term), (act, [b]))) $ S.toList ts
   braces x = "{"<>x<>"}"
   quote x = '"':x <> "\""
-  startSymbol = let (Rule h _) = head rules in NonTerm h
+  startSymbol = let (Rule h _ :| _) = rules in NonTerm h
   r = mkRulesMap rules
   t = buildTable r
   nonTerms = M.keys r
