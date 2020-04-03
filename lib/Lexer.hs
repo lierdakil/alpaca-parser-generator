@@ -105,7 +105,7 @@ scanLine s = left T.pack $ runAlex (T.unpack s) go
                 then go
                 else return []
 
-data Lang = CPP
+data Lang = CPP | Python
 
 makeDFA :: Monad m => [Text] -> MyMonadT m ([(FilePath, Text)], DFA)
 makeDFA input = do
@@ -116,36 +116,35 @@ makeDFA input = do
   return (debug, dfa)
 
 writeLexer :: Monad m => DFA -> Lang -> MyMonadT m ([Symbol], [(FilePath, Text)])
-writeLexer dfa CPP = do
+writeLexer dfa lang = do
   accSt <- catMaybes <$> mapM (\(f, (s, _)) -> fmap (f,) <$> isSingle f s) stList
-  let accStS = IS.fromList $ map fst accSt
-      checkAccepting st
-        | st `IS.member` accStS
-        = "lastAccChIx = curChIx; accSt = "<>tshow st <>";"
-        | otherwise = ""
-      tokNames = nub $ mapMaybe (fst . snd) accSt
-      returnResult = T.concat (foldr ((:) . returnResult1) [] accSt)
+  let tokNames = nub $ mapMaybe (fst . snd) accSt
       terminals = TermEof : map Term tokNames
-      tokReflect = T.intercalate "," . map (\x -> "\"" <> x <> "\"") $ "%eof":tokNames
-      checkState (curSt, (_, charTrans)) = "state_" <> tshow curSt <> ":"
-        <> checkAccepting curSt
-        <> "if(curChIx == endIx) goto end;"
-        <> "curCh = *curChIx; ++curChIx;"
-        <> T.intercalate " else " (foldr ((:) . checkChars) [] charTrans)
-        <> "goto end;"
-      transTable = foldMap checkState stList
-  return $ (,) terminals [
-      ( "tokenType.h"
-      , [interp|
-        #ifndef TOKEN_TYPE_H
-        #define TOKEN_TYPE_H
-        #include <cstddef>
-        enum class TokenType : std::size_t {
-          eof, #{T.intercalate "," (map ("Tok_"<>) tokNames)}
-        };
-        #endif|]
-      )
-    , ("lexer.h", [interp|
+  return . (,) terminals $ writeLexerFiles accSt tokNames stList lang
+  where
+  stList = map (second (second M.toList)) $ IM.toList dfa
+  isSingle f xs
+    | S.null xs = return Nothing
+    | S.size xs == 1 = return $ Just (S.findMin xs)
+    | otherwise = do
+        tell ["Lexer: Multiple actions/tokens match the same state " <> tshow f <> ": " <> tshow xs <> ". Choosing the first option."]
+        return (Just $ S.findMin xs)
+
+writeLexerFiles :: [(IS.Key, (Maybe Text, Action))]
+                -> [Text]
+                -> [(Int, (StateAttr, [(NonEmpty CharPattern, Int)]))]
+                -> Lang
+                -> [(FilePath, Text)]
+writeLexerFiles accSt tokNames stList CPP =
+  [ ( "tokenType.h", [interp|
+#ifndef TOKEN_TYPE_H
+#define TOKEN_TYPE_H
+#include <cstddef>
+enum class TokenType : std::size_t {
+  eof, #{T.intercalate "," (map ("Tok_"<>) tokNames)}
+};
+#endif|])
+  , ("lexer.h", [interp|
 #ifndef LEXER_H
 #define LEXER_H
 #include <string>
@@ -168,7 +167,8 @@ public:
   Token getNextToken();
 };
 #endif
-|]) , ("lexer.cpp", [interp|
+|])
+  , ("lexer.cpp", [interp|
 #include "lexer.h"
 #include <stdexcept>
 #include <iostream>
@@ -203,9 +203,22 @@ Token Lexer::getNextToken() {
   return mkToken(TokenType::eof); }
   throw std::runtime_error("Unexpected input: " + std::string(startChIx, lastReadChIx));
 }
-|])
-    ]
+|])]
   where
+  accStS = IS.fromList $ map fst accSt
+  checkAccepting st
+    | st `IS.member` accStS
+    = "lastAccChIx = curChIx; accSt = "<>tshow st <>";"
+    | otherwise = ""
+  returnResult = T.concat (foldr ((:) . returnResult1) [] accSt)
+  tokReflect = T.intercalate "," . map (\x -> "\"" <> x <> "\"") $ "%eof":tokNames
+  checkState (curSt, (_, charTrans)) = "state_" <> tshow curSt <> ":"
+    <> checkAccepting curSt
+    <> "if(curChIx == endIx) goto end;"
+    <> "curCh = *curChIx; ++curChIx;"
+    <> T.intercalate " else " (foldr ((:) . checkChars) [] charTrans)
+    <> "goto end;"
+  transTable = foldMap checkState stList
   returnResult1 (st, (Just name, act))
     = "case "<> tshow st <>":\
       \if (debug) std::cerr << \"Lexed token " <> name <> ": \\\"\" << text << \"\\\"\" << std::endl; \
@@ -216,15 +229,82 @@ Token Lexer::getNextToken() {
       \goto start;"
   mkAct NoAction = ""
   mkAct (Action act) = "," <> act
-  isSingle f xs
-    | S.null xs = return Nothing
-    | S.size xs == 1 = return $ Just (S.findMin xs)
-    | otherwise = do
-        tell ["Lexer: Multiple actions/tokens match the same state " <> tshow f <> ": " <> tshow xs <> ". Choosing the first option."]
-        return (Just $ S.findMin xs)
   checkChars (charGroup, newSt) = "if(" <> charCond charGroup <> ") goto state_" <> tshow newSt <> ";"
   charCond = T.intercalate "||" . map charCond1 . NE.toList
   charCond1 (CChar c) = "curCh == " <> tshow c
   charCond1 (CRange c1 c2) = "(curCh >= " <> tshow c1 <> " && curCh <= " <> tshow c2 <> ")"
   charCond1 CAny = "true"
-  stList = map (second (second M.toList)) $ IM.toList dfa
+
+writeLexerFiles accSt tokNames stList Python = do
+  [ ("lexer.py", [interp|
+from enum import Enum
+class TokenType(Enum):
+    eof = 0
+    #{indent 1 tokDefns}
+
+class Lexer:
+    def __init__(self, input, mkToken, debug = False):
+        self.input = input
+        self.curChIx = 0
+        self.debug = debug
+        self.mkToken = mkToken
+
+    def getNextToken():
+        lastAccChIx = self.curChIx
+        startChIx = self.curChIx
+        curCh = '\\0'
+        accSt = -1
+        curSt = 0
+        while curSt >= 0:
+            if curSt in [#{T.intercalate "," $ map (tshow . fst) accSt}]:
+                lastAccChIx = self.curChIx
+                accSt = curSt
+            if self.curChIx >= len(self.input): break
+            curCh = self.input[self.curChIx]
+            self.curChIx+=1
+            #{indent 3 transTable}
+            break
+
+        lastReadChIx = self.curChIx
+        self.curChIx = lastAccChIx
+        text = self.input[startChIx:lastAccChIx]
+        #{indent 2 returnResult}
+        if self.curChIx >= len(self.input):
+            if self.debug: print("Got EOF while lexing \\"" + text + "\\"")
+            return self.mkToken(TokenType.eof)
+        raise Exception("Unexpected input: " + self.input[startChIx:lastReadChIx])
+|])]
+  where
+  indent n s = T.unlines $ case T.lines s of
+    (x:xs) -> x : map (T.replicate (n*4) " " <>) xs
+    [] -> []
+  returnResult = T.intercalate "\nel" (map returnResult1 accSt)
+  returnResult1 (st, (Just name, act)) = [interp|
+    if accSt == #{tshow st}:
+        if self.debug: print("Lexed token #{name}: \\"" + text + "\\"")
+        return self.mkToken(TokenType.Tok_#{name}#{mkAct act})
+    |]
+  returnResult1 (st, (Nothing, _)) = [interp|
+    if accSt == #{tshow st}:
+        if self.debug: print("Skipping state #{tshow st}: \\"" + text + "\\"")
+        return self.getNextToken()
+    |]
+  checkState (_, (_, [])) = Nothing
+  checkState (curSt, (_, charTrans)) = Just [interp|
+  if curSt == #{tshow curSt}:
+      #{indent 1 $ T.intercalate "\nel" (map checkChars charTrans)}
+      break
+  |]
+  transTable = T.intercalate "\nel" $ mapMaybe checkState stList
+  tokDefns = T.intercalate "\n" . map (\(x,n) -> "Tok_"<>x<>" = "<>tshow n) $ zip tokNames [1::Word ..]
+  mkAct NoAction = ""
+  mkAct (Action act) = "," <> act
+  checkChars (charGroup, newSt) = [interp|
+    if #{charCond charGroup}:
+        curSt = #{tshow newSt}
+        continue
+    |]
+  charCond = T.intercalate " or " . map charCond1 . NE.toList
+  charCond1 (CChar c) = "curCh == " <> tshow c
+  charCond1 (CRange c1 c2) = "(curCh >= " <> tshow c1 <> " and curCh <= " <> tshow c2 <> ")"
+  charCond1 CAny = "True"
