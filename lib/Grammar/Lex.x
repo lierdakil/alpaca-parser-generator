@@ -1,6 +1,6 @@
 {
 {-# LANGUAGE OverloadedStrings #-}
-module GrammarLex where
+module Grammar.Lex where
 import Data.Text (Text, pack)
 }
 

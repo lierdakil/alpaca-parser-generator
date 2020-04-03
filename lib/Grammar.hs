@@ -15,8 +15,8 @@ module Grammar (
   , isLeftRecursive
   ) where
 
-import GrammarLex
-import GrammarParse
+import Grammar.Lex
+import Grammar.Parse
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Maybe

@@ -20,19 +20,19 @@ extra-source-files:  CHANGELOG.md
 library
   hs-source-dirs:      lib
   exposed-modules:     Lexer
-                     , ParseRecursive
-                     , ParseLL
-                     , ParseLR
-                     , ParseSLR
-                     , ParseLALR
+                     , Parser.Recursive
+                     , Parser.LL
+                     , Parser.LR
+                     , Parser.SLR
+                     , Parser.LALR
                      , MonadTypes
-                     , Utils
-  other-modules:       RegexLex
-                     , RegexParse
-                     , GrammarLex
-                     , GrammarParse
+  other-modules:       Regex.Lex
+                     , Regex.Parse
+                     , Grammar.Lex
+                     , Grammar.Parse
                      , Grammar
                      , FA
+                     , Utils
   build-depends:       base >= 4 && < 5
                      , containers
                      , mtl

@@ -6,7 +6,7 @@
            , OverloadedStrings
            , QuasiQuotes
            #-}
-module ParseLR (Proxy(..)
+module Parser.LR (Proxy(..)
   , LRPoint(..)
   , LR1Point(..)
   , LR0Point(..)

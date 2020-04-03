@@ -11,8 +11,8 @@ import qualified Data.List.NonEmpty as NE
 import Data.List
 import Data.Maybe
 import Control.Arrow
-import RegexParse
-import RegexLex (alexMonadScan, runAlex, Token(..))
+import Regex.Parse
+import Regex.Lex (alexMonadScan, runAlex, Token(..))
 import Grammar (Symbol(..))
 import FA
 import MonadTypes

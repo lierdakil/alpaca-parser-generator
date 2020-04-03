@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings, ScopedTypeVariables, QuasiQuotes #-}
-module ParseRecursive where
+module Parser.Recursive where
 
 import Grammar
 

@@ -9,7 +9,7 @@ module FA (
   , dfaToGraphviz
   ) where
 
-import RegexParse (Action, CharPattern(..))
+import Regex.Parse (Action, CharPattern(..))
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.IntMap as IM

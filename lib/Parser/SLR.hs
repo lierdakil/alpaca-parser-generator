@@ -1,8 +1,8 @@
 {-# LANGUAGE TypeFamilies, OverloadedStrings #-}
-module ParseSLR where
+module Parser.SLR where
 
 import Grammar
-import ParseLR
+import Parser.LR
 import qualified Data.Set as S
 import Data.Function
 import qualified Data.Text as T

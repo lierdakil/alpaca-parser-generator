@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleContexts, OverloadedStrings, QuasiQuotes #-}
-module ParseLL (makeLLParser) where
+module Parser.LL (makeLLParser) where
 
 import Grammar
 import Data.Maybe

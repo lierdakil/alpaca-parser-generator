@@ -1,8 +1,8 @@
 {
 {-# LANGUAGE OverloadedStrings #-}
-module GrammarParse where
+module Grammar.Parse where
 
-import GrammarLex
+import Grammar.Lex
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Text (Text)
 import qualified Data.Text as T

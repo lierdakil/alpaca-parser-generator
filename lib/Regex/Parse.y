@@ -1,7 +1,7 @@
 {
-module RegexParse where
+module Regex.Parse where
 
-import RegexLex
+import Regex.Lex
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Text (Text)
 import qualified Data.Text as T
