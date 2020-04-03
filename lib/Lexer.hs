@@ -273,9 +273,7 @@ class Lexer:
         raise Exception("Unexpected input: " + self.input[startChIx:lastReadChIx])
 |])]
   where
-  indent n s = T.intercalate "\n" $ case T.lines s of
-    (x:xs) -> x : map (T.replicate (n*4) " " <>) xs
-    [] -> []
+  indent = indentLang Python
   returnResult = T.intercalate "\nel" (map returnResult1 accSt)
   returnResult1 (st, (Just name, act)) = [interp|
     if accSt == #{tshow st}:

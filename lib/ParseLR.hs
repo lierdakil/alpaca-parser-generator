@@ -117,15 +117,15 @@ makeLRParser :: forall p m. (LRPoint p, Monad m)
              -> MyMonadT m [(FilePath,Text)]
 makeLRParser _ input base name tokens
   = do
-    rules <- parse input
+    Grammar gtop rules <- parse input
     let Rule start _ :| _ = rules
         r = mkRulesMap (Rule ExtendedStartRule (([NonTerm start, TermEof], Nothing) :| []) <| rules)
-    writeLRParser base name tokens r $ buildLRAutomaton @p start r
+    writeLRParser base name tokens gtop r $ buildLRAutomaton @p start r
 
 data Action p = Shift Word | Reduce ((Text, [Symbol]), Maybe Text) | Reject deriving (Show, Eq, Ord)
 
-writeLRParser :: forall p m. (LRPoint p, Monad m) => FilePath -> Text -> [Symbol] -> RulesMap -> LRAutomaton p -> MyMonadT m [(FilePath,Text)]
-writeLRParser base name tokens r t = do
+writeLRParser :: forall p m. (LRPoint p, Monad m) => FilePath -> Text -> [Symbol] -> Text -> RulesMap -> LRAutomaton p -> MyMonadT m [(FilePath,Text)]
+writeLRParser base name tokens gtop r t = do
   actionTable <- make2dTableM mkActionTableCell states tokens
   gotoTable <- make2dTableM mkGotoTableCell states nonTerminals
   return [
@@ -134,9 +134,9 @@ writeLRParser base name tokens r t = do
 #ifndef #{headerName}_H
 #define #{headerName}_H
 #include "lexer.h"
-#include "parseResult.h"
 #include <stack>
 #include <variant>
+#{gtop}
 class #{name} {
   Lexer *lex;
   bool debug;
@@ -153,6 +153,7 @@ public:
 #include "#{baseText}.h"
 #include <stdexcept>
 #include <iostream>
+#{gtop}
 static const std::string stateToString(std::size_t state) {
   static constexpr const char* names[] = {#{stateToString}};
   return names[state];

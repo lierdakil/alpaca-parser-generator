@@ -16,9 +16,13 @@ tokens :-
 <0> \|                   { mkTok $ const TAlternative }
 <0> \;                   { mkTok $ const TSep }
 <0> \{                   { begin action }
+<0> ^\%top\n             { begin top }
 
 <action> .*/\}           { mkTok TAction }
 <action> \}              { begin 0 }
+
+<top> ^\%end\n           { begin 0 }
+<top> .*\n               { mkTok TTop }
 
 {
 data Token =
@@ -29,6 +33,7 @@ data Token =
   | TTerminal Text
   | TNonTerminal Text
   | TAction Text
+  | TTop Text
   | TEOF
   deriving (Eq, Show)
 

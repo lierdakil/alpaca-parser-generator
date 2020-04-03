@@ -1,10 +1,11 @@
-{-# LANGUAGE TemplateHaskellQuotes #-}
+{-# LANGUAGE TemplateHaskellQuotes, OverloadedStrings #-}
 module Utils where
 
 import Language.Haskell.TH.Quote
 import Data.Text (Text, pack)
 import Data.Char
 import Data.List
+import qualified Data.Text as T
 import qualified Data.String.Interpolate as I
 
 data Lang = CPP | Python
@@ -24,3 +25,11 @@ interp = I.i{quoteExp = quoteExp I.i . unindent }
 
 interp' :: QuasiQuoter
 interp' = I.i
+
+indentLang :: Lang -> Int -> Text -> Text
+indentLang lang n s = T.intercalate "\n" $ case T.lines s of
+  (x:xs) -> x : map (T.replicate (n*is lang) " " <>) xs
+  [] -> []
+  where
+  is Python = 4
+  is _ = 2

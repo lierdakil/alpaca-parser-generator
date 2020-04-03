@@ -24,3 +24,6 @@ runInIO = (>>= output) . runWriterT . runExceptT
   where output (eitherErrorResult, warning) = do
           mapM_ T.putStrLn warning
           either (T.putStrLn . T.unlines) return eitherErrorResult
+
+runMyMonad :: MyMonad a -> (Either [Text] a, [Text])
+runMyMonad = runIdentity . runWriterT . runExceptT

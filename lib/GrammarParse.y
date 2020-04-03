@@ -1,9 +1,11 @@
 {
+{-# LANGUAGE OverloadedStrings #-}
 module GrammarParse where
 
 import GrammarLex
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Text (Text)
+import qualified Data.Text as T
 }
 
 %name grammar
@@ -18,13 +20,18 @@ import Data.Text (Text)
   nont { TNonTerminal $$ }
   act  { TAction $$ }
   eof  { TEOF }
+  top  { TTop $$ }
 
 %left '|'
 
 %%
 
 Start
-  : Rules eof  { $1 [] }
+  : Tops Rules eof  { Grammar $1 ($2 []) }
+
+Tops
+  : Tops top        { $1 <> $2 }
+  |                 { "" }
 
 Rules
   : Rules Rule { $1 . ($2 :) }
@@ -54,6 +61,7 @@ Symbol
   | teof                  { TermEof }
 
 {
+data Grammar = Grammar Text (NonEmpty Rule)
 data Symbol = TermEof | Term Text | NonTerm Text deriving (Eq, Ord, Show)
 data Rule = Rule Text (NonEmpty ([Symbol], Maybe Text)) deriving (Eq, Show)
 

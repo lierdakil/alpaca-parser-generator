@@ -20,8 +20,8 @@ type Table = M.Map (Symbol, [Symbol]) (S.Set Symbol, Maybe Text)
 makeLLParser :: Monad m => Text -> FilePath -> [Symbol] -> MyMonadT m [(FilePath,Text)]
 makeLLParser t f s = parse t >>= buildLLParser f s
 
-buildLLParser :: Monad m => FilePath -> [Symbol] -> Rules -> MyMonadT m [(FilePath,Text)]
-buildLLParser basename tokens rules = do
+buildLLParser :: Monad m => FilePath -> [Symbol] -> Grammar -> MyMonadT m [(FilePath,Text)]
+buildLLParser basename tokens (Grammar gtop rules) = do
   lr <- isLeftRecursive r
   when lr $ throwError ["LL(1) parser can not handle left-recursive grammar"]
   cells <- mapM (forM tokens . writeCell) nonTerms
@@ -40,6 +40,7 @@ buildLLParser basename tokens rules = do
 #include <stack>
 #include <string>
 #include <variant>
+#{gtop}
 class ParserLL {
   enum class NonTerminal : std::size_t { #{T.intercalate ", " (map ("NT_" <>) nonTerms)} };
   using Symbol = std::variant<NonTerminal, TokenType, std::size_t>;
@@ -59,6 +60,7 @@ public:
 #include "#{basename}.h"
 #include <stdexcept>
 #include <iostream>
+#{gtop}
 const std::string ParserLL::to_string(NonTerminal nt) {
   static constexpr const char *names[] = { #{T.intercalate "," (map quote nonTerms)} };
   return names[static_cast<std::size_t>(nt)];

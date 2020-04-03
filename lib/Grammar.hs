@@ -5,6 +5,7 @@ module Grammar (
   , Alt
   , RulesMap
   , Rules
+  , Grammar(..)
   , parse
   , showBody
   , showSymbol
@@ -31,7 +32,7 @@ type Alt = ([Symbol], Maybe Text)
 type RulesMap = M.Map Text (NonEmpty Alt)
 type Rules = NonEmpty Rule
 
-parse :: Monad m => Text -> MyMonadT m Rules
+parse :: Monad m => Text -> MyMonadT m Grammar
 parse = fmap grammar . scan
 
 scan :: Monad m => Text -> MyMonadT m [Token]

@@ -30,7 +30,8 @@ main = do
     writeFiles lexer
     (_, lexer) <- writeLexer dfa Python
     writeFiles lexer
-    wrap "recursive parser" $ makeParser grammar "recursiveParser"
+    wrap "recursive parser" $ makeParser grammar CPP "recursiveParser"
+    wrap "recursive parser" $ makeParser grammar Python "recursiveParser"
     wrap "LL(1) parser" $ makeLLParser grammar "llParser" tokens
     wrap "LR(0) parser" $ makeLRParser (Proxy :: Proxy LR0Point) grammar "lr0Parser" "ParserLR0" tokens
     wrap "LR(1) parser" $ makeLRParser (Proxy :: Proxy LR1Point) grammar "lr1Parser" "ParserLR1" tokens

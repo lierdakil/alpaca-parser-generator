@@ -24,11 +24,11 @@ makeLALRParser :: (Monad m)
              -> MyMonadT m [(FilePath,Text)]
 makeLALRParser input base name tokens
   = do
-    rules <- parse input
+    Grammar top rules <- parse input
     let Rule start _ :| _ = rules
         r = mkRulesMap (Rule ExtendedStartRule (([NonTerm start], Nothing) :| []) <| rules)
     automaton <- lalrify $ buildLRAutomaton @LR1Point start r
-    writeLRParser base name tokens r automaton
+    writeLRParser base name tokens top r automaton
 
 lalrify :: Monad m => LRAutomaton LR1Point -> MyMonadT m (LRAutomaton LALRPoint)
 lalrify t = (,) (lookup' (fst t)) . M.fromAscList
