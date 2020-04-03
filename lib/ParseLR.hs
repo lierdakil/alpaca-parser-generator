@@ -35,7 +35,6 @@ import qualified Control.Arrow as A
 import Data.Text (Text)
 import qualified Data.Text as T
 import Utils
-import qualified Data.String.Interpolate as I
 
 class (Ord a, Ord (Lookahead a)) => LRPoint a where
   type family Lookahead a
@@ -131,7 +130,7 @@ writeLRParser base name tokens r t = do
   gotoTable <- make2dTableM mkGotoTableCell states nonTerminals
   return [
       (base <> ".txt",  printTable r t)
-    , (base <> ".h", [I.i|
+    , (base <> ".h", [interp|
 #ifndef #{headerName}_H
 #define #{headerName}_H
 #include "lexer.h"
@@ -150,36 +149,36 @@ public:
   ResultType parse();
 };
 #endif
-|]) , (base <> ".cpp", [I.i|
-  #include "#{baseText}.h"
-  #include <stdexcept>
-  #include <iostream>
-  static const std::string stateToString(std::size_t state) {
-    static constexpr const char* names[] = {#{stateToString}};
-    return names[state];
-  }
-  static const std::string expectedSym(std::size_t state) {
-    static constexpr const char* names[] = {#{expectedSym}};
-    return names[state];
-  }
-  const std::size_t #{name}::Action[#{statesLenStr}][#{termLenStr}] = { #{actionTable} };
-  const std::size_t #{name}::GOTO[#{statesLenStr}][#{nonTermLenStr}] = { #{gotoTable} };
-  std::size_t #{name}::top() const { return stack.empty() ? 0 : stack.top().first; }
-  #{name}::#{name}(Lexer *lex, bool debug):lex(lex),debug(debug) {}
-  ResultType #{name}::parse() {
-    Token a = lex->getNextToken();
-    while (true) {
-      auto action = Action[top()][static_cast<std::size_t>(a.type)];
-      switch (action) {
-      #{actionCases}
-      default:
-        if(debug)std::cerr<<"Shift to "<<action<<std::endl;
-        stack.push({action, a});
-        a=lex->getNextToken();
-        break;
-      }
+|]) , (base <> ".cpp", [interp|
+#include "#{baseText}.h"
+#include <stdexcept>
+#include <iostream>
+static const std::string stateToString(std::size_t state) {
+  static constexpr const char* names[] = {#{stateToString}};
+  return names[state];
+}
+static const std::string expectedSym(std::size_t state) {
+  static constexpr const char* names[] = {#{expectedSym}};
+  return names[state];
+}
+const std::size_t #{name}::Action[#{statesLenStr}][#{termLenStr}] = { #{actionTable} };
+const std::size_t #{name}::GOTO[#{statesLenStr}][#{nonTermLenStr}] = { #{gotoTable} };
+std::size_t #{name}::top() const { return stack.empty() ? 0 : stack.top().first; }
+#{name}::#{name}(Lexer *lex, bool debug):lex(lex),debug(debug) {}
+ResultType #{name}::parse() {
+  Token a = lex->getNextToken();
+  while (true) {
+    auto action = Action[top()][static_cast<std::size_t>(a.type)];
+    switch (action) {
+    #{actionCases}
+    default:
+      if(debug)std::cerr<<"Shift to "<<action<<std::endl;
+      stack.push({action, a});
+      a=lex->getNextToken();
+      break;
     }
-  }|])]
+  }
+}|])]
   where
   statesLenStr = tshow (length states)
   termLenStr = tshow (length tokens)
