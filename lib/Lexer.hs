@@ -105,8 +105,6 @@ scanLine s = left T.pack $ runAlex (T.unpack s) go
                 then go
                 else return []
 
-data Lang = CPP | Python
-
 makeDFA :: Monad m => [Text] -> MyMonadT m ([(FilePath, Text)], DFA)
 makeDFA input = do
   defs <- liftEither . left T.lines $ mapM (fmap regex . scanLine) input
@@ -235,7 +233,7 @@ Token Lexer::getNextToken() {
   charCond1 (CRange c1 c2) = "(curCh >= " <> tshow c1 <> " && curCh <= " <> tshow c2 <> ")"
   charCond1 CAny = "true"
 
-writeLexerFiles accSt tokNames stList Python = do
+writeLexerFiles accSt tokNames stList Python =
   [ ("lexer.py", [interp|
 from enum import Enum
 class TokenType(Enum):
@@ -249,7 +247,7 @@ class Lexer:
         self.debug = debug
         self.mkToken = mkToken
 
-    def getNextToken():
+    def getNextToken(self):
         lastAccChIx = self.curChIx
         startChIx = self.curChIx
         curCh = '\\0'
@@ -275,7 +273,7 @@ class Lexer:
         raise Exception("Unexpected input: " + self.input[startChIx:lastReadChIx])
 |])]
   where
-  indent n s = T.unlines $ case T.lines s of
+  indent n s = T.intercalate "\n" $ case T.lines s of
     (x:xs) -> x : map (T.replicate (n*4) " " <>) xs
     [] -> []
   returnResult = T.intercalate "\nel" (map returnResult1 accSt)
@@ -291,10 +289,10 @@ class Lexer:
     |]
   checkState (_, (_, [])) = Nothing
   checkState (curSt, (_, charTrans)) = Just [interp|
-  if curSt == #{tshow curSt}:
-      #{indent 1 $ T.intercalate "\nel" (map checkChars charTrans)}
-      break
-  |]
+    if curSt == #{tshow curSt}:
+        #{indent 1 $ T.intercalate "\nel" (map checkChars charTrans)}
+        break
+    |]
   transTable = T.intercalate "\nel" $ mapMaybe checkState stList
   tokDefns = T.intercalate "\n" . map (\(x,n) -> "Tok_"<>x<>" = "<>tshow n) $ zip tokNames [1::Word ..]
   mkAct NoAction = ""

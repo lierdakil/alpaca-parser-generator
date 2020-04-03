@@ -1,16 +1,19 @@
-{-# LANGUAGE TemplateHaskellQuotes, QuasiQuotes, TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 module Utils where
 
 import Language.Haskell.TH.Quote
 import Data.Text (Text, pack)
 import Data.Char
+import Data.List
 import qualified Data.String.Interpolate as I
+
+data Lang = CPP | Python
 
 tshow :: Show a => a -> Text
 tshow = pack . show
 
 unindent :: String -> String
-unindent s = unlines stripped
+unindent s = intercalate "\n" . reverse . dropWhile (all isSpace) $ reverse stripped
   where ls = dropWhile (all isSpace) $ lines s
         minIndent = minimum $ map (length . takeWhile isSpace) $ filter (not . null) ls
         stripped = map (\x -> if null x then x else drop minIndent x) ls
