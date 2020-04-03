@@ -25,7 +25,9 @@ library
                      , Parser.LR
                      , Parser.SLR
                      , Parser.LALR
+                     , Parser.Types
                      , MonadTypes
+                     , Lang
   other-modules:       Regex.Lex
                      , Regex.Parse
                      , Grammar.Lex
@@ -33,6 +35,9 @@ library
                      , Grammar
                      , FA
                      , Utils
+                     , Parser.Recursive.Build
+                     , Parser.Recursive.CPP
+                     , Parser.Recursive.Python
   build-depends:       base >= 4 && < 5
                      , containers
                      , mtl

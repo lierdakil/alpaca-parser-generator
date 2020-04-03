@@ -2,11 +2,11 @@
 module Main where
 
 import Lexer
-import ParseRecursive
-import ParseLL
-import ParseLR
-import ParseSLR
-import ParseLALR
+import Parser.Recursive
+-- import ParseLL
+-- import ParseLR
+-- import ParseSLR
+-- import ParseLALR
 import System.Environment
 import System.FilePath
 import System.Directory
@@ -30,13 +30,21 @@ main = do
     writeFiles lexer
     (_, lexer) <- writeLexer dfa Python
     writeFiles lexer
-    wrap "recursive parser" $ makeParser grammar CPP "recursiveParser"
-    wrap "recursive parser" $ makeParser grammar Python "recursiveParser"
-    wrap "LL(1) parser" $ makeLLParser grammar "llParser" tokens
-    wrap "LR(0) parser" $ makeLRParser (Proxy :: Proxy LR0Point) grammar "lr0Parser" "ParserLR0" tokens
-    wrap "LR(1) parser" $ makeLRParser (Proxy :: Proxy LR1Point) grammar "lr1Parser" "ParserLR1" tokens
-    wrap "SLR parser" $ makeLRParser (Proxy :: Proxy SLRPoint) grammar "slrParser" "ParserSLR" tokens
-    wrap "LALR parser" $ makeLALRParser grammar "lalrParser" "ParserLALR" tokens
+    wrap "recursive parser" $ makeParser cpp recursiveParser ParserOptions{
+        parserOptionsName = "Parser"
+      , parserOptionsBaseFileName = "recursiveParser"
+      , parserOptionsGrammarDefinition = grammar
+    }
+    wrap "recursive parser" $ makeParser python recursiveParser ParserOptions{
+        parserOptionsName = "Parser"
+      , parserOptionsBaseFileName = "recursiveParser"
+      , parserOptionsGrammarDefinition = grammar
+    }
+    -- wrap "LL(1) parser" $ makeLLParser grammar "llParser" tokens
+    -- wrap "LR(0) parser" $ makeLRParser (Proxy :: Proxy LR0Point) grammar "lr0Parser" "ParserLR0" tokens
+    -- wrap "LR(1) parser" $ makeLRParser (Proxy :: Proxy LR1Point) grammar "lr1Parser" "ParserLR1" tokens
+    -- wrap "SLR parser" $ makeLRParser (Proxy :: Proxy SLRPoint) grammar "slrParser" "ParserSLR" tokens
+    -- wrap "LALR parser" $ makeLALRParser grammar "lalrParser" "ParserLALR" tokens
   return ()
 
 wrap n m =
