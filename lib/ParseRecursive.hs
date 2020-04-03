@@ -7,7 +7,6 @@ import Data.Maybe
 import qualified Data.Set as S
 import MonadTypes
 import Control.Monad
-import Data.Foldable
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 import Data.Text (Text)

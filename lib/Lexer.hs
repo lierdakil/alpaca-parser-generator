@@ -1,4 +1,4 @@
-{-# LANGUAGE TupleSections, FlexibleContexts, OverloadedStrings #-}
+{-# LANGUAGE TupleSections, FlexibleContexts, OverloadedStrings, QuasiQuotes #-}
 module Lexer (makeDFA, writeLexer, Lang(..)) where
 
 import qualified Data.Map as M
@@ -136,71 +136,74 @@ writeLexer dfa CPP = do
       transTable = foldMap checkState stList
   return $ (,) terminals [
       ( "tokenType.h"
-      , "#ifndef TOKEN_TYPE_H\n#define TOKEN_TYPE_H\n"
-        <> "enum class TokenType : std::size_t { eof, "
-        <> T.intercalate "," (map ("Tok_"<>) tokNames)
-        <> "};"
-        <> "\n#endif\n"
+      , [interp|
+        #ifndef TOKEN_TYPE_H
+        #define TOKEN_TYPE_H
+        #include <cstddef>
+        enum class TokenType : std::size_t {
+          eof, #{T.intercalate "," (map ("Tok_"<>) tokNames)}
+        };
+        #endif|]
       )
-    , ("lexer.h", "\
-\#ifndef LEXER_H\n\
-\#define LEXER_H\n\
-\#include <Text>\n\
-\#include \"tokenType.h\"\n\
-\const std::Text to_string(TokenType tt);\n\
-\#if __has_include(\"token.h\")\n\
-\#include \"token.h\"\n\
-\#else\n\
-\struct Token{TokenType type; std::Text text;};\
-\Token mkToken(TokenType type, const std::string_view &text = \"\");\n\
-\#endif\n\
-\class Lexer {\
-  \const std::Text _input;\
-  \const std::string_view input;\
-  \std::Text::const_iterator curChIx;\
-  \std::Text::const_iterator endIx;\
-  \const bool debug;\
-\public:\
-  \Lexer(const std::Text &input, bool debug);\
-  \Token getNextToken();\
-\};\n\
-\#endif\n")
-    , ("lexer.cpp", "\
-\#include \"lexer.h\"\n\
-\#include <stdexcept>\n\
-\#include <iostream>\n\
-\const std::Text to_string(TokenType tt){\
-\static constexpr const char *names[] = {" <> tokReflect <> " };\
-\return names[static_cast<std::size_t>(tt)];\
-\}\n\
-\#if __has_include(\"token.h\")\n\
-\#else\n\
-\Token mkToken(TokenType type, const std::string_view &text) {\
-  \return Token{type, std::Text(text)};\
-\}\n\
-\#endif\n\
-\Lexer::Lexer(const std::Text &input, bool debug=false) \
-\: _input(input), input(_input), curChIx(input.cbegin()), endIx(input.cend()), debug(debug) {}\
-\Token Lexer::getNextToken() {\
-  \start:\
-  \auto lastAccChIx = curChIx;\
-  \auto startChIx = curChIx;\
-  \char curCh;\
-  \int accSt = -1;\
-  \"<> transTable <> "\
-  \end:\
-  \auto lastReadChIx = curChIx;\
-  \curChIx = lastAccChIx;\
-  \std::string_view text(&*startChIx, std::distance(startChIx, curChIx));\
-  \switch(accSt){\
-  \" <> returnResult <> "\
-  \}\
-  \if (curChIx == endIx) { \
-  \if (debug) std::cerr << \"Got EOF while lexing \\\"\" << text << \"\\\"\" << std::endl; \
-  \return mkToken(TokenType::eof); }\
-  \throw std::runtime_error(\"Unexpected input: \" + std::Text(startChIx, lastReadChIx));\
-\}\
-\")
+    , ("lexer.h", [interp|
+#ifndef LEXER_H
+#define LEXER_H
+#include <string>
+#include "tokenType.h"
+const std::string to_string(TokenType tt);
+#if __has_include("token.h")
+#include "token.h"
+#else
+struct Token{TokenType type; std::string text;};
+Token mkToken(TokenType type, const std::string_view &text = "");
+#endif
+class Lexer {
+  const std::string _input;
+  const std::string_view input;
+  std::string::const_iterator curChIx;
+  std::string::const_iterator endIx;
+  const bool debug;
+public:
+  Lexer(const std::string &input, bool debug);
+  Token getNextToken();
+};
+#endif
+|]) , ("lexer.cpp", [interp|
+#include "lexer.h"
+#include <stdexcept>
+#include <iostream>
+const std::string to_string(TokenType tt){
+static constexpr const char *names[] = { #{tokReflect} };
+return names[static_cast<std::size_t>(tt)];
+}
+#if __has_include("token.h")
+#else
+Token mkToken(TokenType type, const std::string_view &text) {
+  return Token{type, std::string(text)};
+}\n
+#endif\n
+Lexer::Lexer(const std::string &input, bool debug=false)
+: _input(input), input(_input), curChIx(input.cbegin()), endIx(input.cend()), debug(debug) {}
+Token Lexer::getNextToken() {
+  start:
+  auto lastAccChIx = curChIx;
+  auto startChIx = curChIx;
+  char curCh;
+  int accSt = -1;
+  #{transTable}
+  end:
+  auto lastReadChIx = curChIx;
+  curChIx = lastAccChIx;
+  std::string_view text(&*startChIx, std::distance(startChIx, curChIx));
+  switch(accSt){
+    #{returnResult}
+  }
+  if (curChIx == endIx) {
+  if (debug) std::cerr << "Got EOF while lexing \"" << text << "\"" << std::endl;
+  return mkToken(TokenType::eof); }
+  throw std::runtime_error("Unexpected input: " + std::string(startChIx, lastReadChIx));
+}
+|])
     ]
   where
   returnResult1 (st, (Just name, act))

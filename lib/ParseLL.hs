@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts, OverloadedStrings, QuasiQuotes #-}
 module ParseLL (makeLLParser) where
 
 import Grammar
@@ -32,80 +32,80 @@ buildLLParser basename tokens rules = do
     , (basename <> ".cpp", sourceFile transTable)
     ]
   where
-  headerFile = "\
-\#ifndef PARSER_LL_H\n\
-\#define PARSER_LL_H\n\
-\#include \"lexer.h\"\n\
-\#include \"parseResult.h\"\n\
-\#include <stack>\n\
-\#include <Text>\n\
-\#include <variant>\n\
-\class ParserLL {\
-  \enum class NonTerminal : std::size_t { "<>T.intercalate ", " (map ("NT_" <>) nonTerms)<>" };\
-  \using Symbol = std::variant<NonTerminal, TokenType, std::size_t>;\
-  \static const std::Text to_string(NonTerminal nt);\
-  \Lexer *lex;\
-  \bool debug;\
-  \std::stack<Symbol> stack;\
-  \std::stack<std::variant<ResultType,Token>> resultStack;\
-  \static const std::size_t M["<>tshow(length nonTerms)<>"]["<>tshow (length tokens)<>"][2];\
-\public:\
-  \ParserLL(Lexer *lex, bool debug);\
-  \ResultType parse();\
-\};\n\
-\#endif\n\
-\"
-  sourceFile transTable = "\
-\#include \""<>T.pack basename<>".h\"\n\
-\#include <stdexcept>\n\
-\#include <iostream>\n\
-\const std::Text ParserLL::to_string(NonTerminal nt) {\
-  \static constexpr const char *names[] = {\
-  \"<> T.intercalate "," (map quote nonTerms) <> " };\
-  \return names[static_cast<std::size_t>(nt)];\
-\}\
-\const std::size_t ParserLL::M["<>tshow(length nonTerms)<>"][\
-\"<>tshow (length tokens)<>"][2] = {" <> transTable <> "};\
-\ParserLL::ParserLL(Lexer *lex, bool debug = false):lex(lex),debug(debug) {}\
-\ResultType ParserLL::parse() {\
-  \stack.push("<> encodeSymbol startSymbol <> ");\
-  \Token a = lex->getNextToken();\
-  \while (!stack.empty()) {\
-    \std::visit(\
-        \[&a, this](auto X) {\
-          \using T = std::decay_t<decltype(X)>;\
-          \if constexpr (std::is_same_v<T, TokenType>) {\
-            \if (a.type == X) {\
-              \resultStack.push(a);\
-              \a = lex->getNextToken();\
-              \stack.pop();\
-            \} else {\
-              \throw std::runtime_error(\
-                  \\"Found terminal \" + ::to_string(a.type) + \" but expected \" +\
-                  \::to_string(X) + \".\");\
-            \}\
-          \} else if constexpr (std::is_same_v<T, NonTerminal>) {\
-            \auto trans = M[static_cast<std::size_t>(X)]\
-                              \[static_cast<std::size_t>(a.type)];\
-            \stack.pop();\
-            \stack.push(trans[1]);\
-            \switch(trans[0]) {\
-            \"<>bodies<>"\
-            \case 0: throw std::runtime_error(\
-                    \\"No transition for \"+to_string(X)+\
-                    \\", \"+::to_string(a.type));\
-            \}\
-          \} else if constexpr (std::is_same_v<T, std::size_t>) {\
-            \stack.pop();\
-            \switch(X) {\
-            \"<>actions<>"\
-            \}\
-          \}\
-        \}, stack.top());\
-  \}\
-  \return std::get<0>(resultStack.top());\
-\}\
-\"
+  headerFile = [interp|
+#ifndef PARSER_LL_H
+#define PARSER_LL_H
+#include "lexer.h"
+#include "parseResult.h"
+#include <stack>
+#include <string>
+#include <variant>
+class ParserLL {
+  enum class NonTerminal : std::size_t { #{T.intercalate ", " (map ("NT_" <>) nonTerms)} };
+  using Symbol = std::variant<NonTerminal, TokenType, std::size_t>;
+  static const std::string to_string(NonTerminal nt);
+  Lexer *lex;
+  bool debug;
+  std::stack<Symbol> stack;
+  std::stack<std::variant<ResultType,Token>> resultStack;
+  static const std::size_t M[#{tshow(length nonTerms)}][#{tshow (length tokens)}][2];
+public:
+  ParserLL(Lexer *lex, bool debug);
+  ResultType parse();
+};
+#endif
+|]
+  sourceFile transTable = [interp|
+#include "#{basename}.h"
+#include <stdexcept>
+#include <iostream>
+const std::string ParserLL::to_string(NonTerminal nt) {
+  static constexpr const char *names[] = { #{T.intercalate "," (map quote nonTerms)} };
+  return names[static_cast<std::size_t>(nt)];
+}
+const std::size_t ParserLL::M[#{tshow(length nonTerms)}][#{tshow (length tokens)}][2] = {
+  #{transTable}
+};
+ParserLL::ParserLL(Lexer *lex, bool debug = false):lex(lex),debug(debug) {}
+ResultType ParserLL::parse() {
+  stack.push(#{encodeSymbol startSymbol});
+  Token a = lex->getNextToken();
+  while (!stack.empty()) {
+    std::visit(
+        [&a, this](auto X) {
+          using T = std::decay_t<decltype(X)>;
+          if constexpr (std::is_same_v<T, TokenType>) {
+            if (a.type == X) {
+              resultStack.push(a);
+              a = lex->getNextToken();
+              stack.pop();
+            } else {
+              throw std::runtime_error(
+                  "Found terminal " + ::to_string(a.type) + " but expected " +
+                  ::to_string(X) + ".");
+            }
+          } else if constexpr (std::is_same_v<T, NonTerminal>) {
+            auto trans = M[static_cast<std::size_t>(X)]
+                              [static_cast<std::size_t>(a.type)];
+            stack.pop();
+            stack.push(trans[1]);
+            switch(trans[0]) {
+              #{bodies}
+            case 0: throw std::runtime_error(
+                    "No transition for "+to_string(X)+
+                    ", "+::to_string(a.type));
+            }
+          } else if constexpr (std::is_same_v<T, std::size_t>) {
+            stack.pop();
+            switch(X) {
+              #{actions}
+            }
+          }
+        }, stack.top());
+  }
+  return std::get<0>(resultStack.top());
+}
+|]
   bodyMap = M.fromList $ zip allBodies [(0::Word)..]
   actionMap = M.fromList $ zip (map snd allActions) [(0::Word)..]
   showIdxs (a, b) = braces $ showIdx a <> "," <> showIdx b
@@ -116,8 +116,8 @@ buildLLParser basename tokens rules = do
     | Just (act, b:rest) <- M.lookup (NonTerm nonterm, term) tt
     = do
         unless (null rest) $
-          tell ["LL parser has multiple rules in the same cell: " <> tshow (b:rest),
-                "\tChoosing " <> tshow b]
+          tell [[interp|LL parser has multiple rules in the same cell: #{tshow (b:rest)}|],
+                [interp|Choosing #{tshow b}|]]
         return (M.lookup b bodyMap, act >>= flip M.lookup actionMap)
     | otherwise = return (Nothing, Nothing)
   tt = M.fromListWith (liftM2 (++)) . foldMap r2t $ M.toList t
@@ -134,22 +134,30 @@ buildLLParser basename tokens rules = do
   traverse' (x, Just v) = Just (x, v)
   bodies = foldMap (uncurry makeBody) $ zip [1::Word ..] allBodies
   actions = foldMap (uncurry makeAction) $ zip [1::Word ..] allActions
-  makeBody n b = "case " <> tshow n <>": "
-    <> "if(debug) std::cerr << to_string(X) << \" -> " <> showBody b <> "\" << std::endl;"
-    <> foldMap (\s -> "stack.push(" <> encodeSymbol s <> ");") (reverse b)
-    <> "break;"
-  makeAction n (body, code)
-    = "case " <> tshow n <>": {"
-    <> T.concat (reverse $ zipWith showArg body [1::Word ..])
-    <> "resultStack.push(([]("<>argDefs<>") {" <> code <> "})("<>args<>"));"
-    <> "break; }"
+  makeBody n b = [interp|
+  case #{tshow n}:
+    if(debug) std::cerr << to_string(X) << " -> #{showBody b}" << std::endl;
+    #{foldMap pushSymbol (reverse b)}
+    break;
+  |] :: Text
+  pushSymbol s = [interp|stack.push(#{encodeSymbol s});|] :: Text
+  makeAction n (body, code) = [interp|
+    case #{tshow n}: {
+      #{T.concat (reverse $ zipWith showArg body [1::Word ..])}
+      resultStack.push(([](#{argDefs}) { #{code} })(#{args}));
+      break;
+    }|] :: Text
     where
       argDefs = T.intercalate "," $ zipWith showArgDef body [1::Word ..]
       args = T.intercalate "," $ zipWith showCallArg body [1::Word ..]
       showArgDef _ i = "const auto &_" <> tshow i
       showCallArg _ i = "_" <> tshow i
-      showArg (NonTerm _) i = "auto _"<>tshow i<>"=std::get<0>(resultStack.top()); resultStack.pop();"
-      showArg _ i = "auto _"<>tshow i<>"=std::get<1>(resultStack.top()); resultStack.pop();"
+      showArg (NonTerm _) i = [interp|
+        auto _#{tshow i}=std::get<0>(resultStack.top());
+        resultStack.pop();|]
+      showArg _ i = [interp|
+        auto _#{tshow i}=std::get<1>(resultStack.top());
+        resultStack.pop();|]
 
 encodeSymbol :: Symbol -> Text
 encodeSymbol (NonTerm nt) = "NonTerminal::NT_" <> nt

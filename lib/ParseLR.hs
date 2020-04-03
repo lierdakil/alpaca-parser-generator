@@ -4,6 +4,7 @@
            , ScopedTypeVariables
            , PatternSynonyms
            , OverloadedStrings
+           , QuasiQuotes
            #-}
 module ParseLR (Proxy(..)
   , LRPoint(..)
@@ -34,6 +35,7 @@ import qualified Control.Arrow as A
 import Data.Text (Text)
 import qualified Data.Text as T
 import Utils
+import qualified Data.String.Interpolate as I
 
 class (Ord a, Ord (Lookahead a)) => LRPoint a where
   type family Lookahead a
@@ -129,60 +131,64 @@ writeLRParser base name tokens r t = do
   gotoTable <- make2dTableM mkGotoTableCell states nonTerminals
   return [
       (base <> ".txt",  printTable r t)
-    , (base <> ".h", "\
-\#ifndef "<> T.map toUpper name <> "_H\n\
-\#define "<> T.map toUpper name <> "_H\n\
-\#include \"lexer.h\"\n\
-\#include \"parseResult.h\"\n\
-\#include <stack>\n\
-\#include <variant>\n\
-\class "<>name<>" {\
-  \Lexer *lex;\
-  \bool debug;\
-  \std::stack<std::pair<std::size_t,std::variant<ResultType,Token>>> stack;\
-  \static const std::size_t Action["<>tshow (length states)<>"]["
-    <>tshow (length tokens)<>"];\
-  \static const std::size_t GOTO["<>tshow (length states)<>"]["
-    <>tshow (length nonTerminals)<>"];\
-  \std::size_t top() const;\
-\public:\
-  \"<>name<>"(Lexer *lex, bool debug = false);\
-  \ResultType parse();\
-\};\n\
-\#endif\n\
-\") , (base <> ".cpp", "\
-  \#include \""<>T.pack base<>".h\"\n\
-  \#include <stdexcept>\n\
-  \#include <iostream>\n\
-  \static const std::Text stateToString(std::size_t state) {\
-    \static constexpr const char* names[] = {"<>T.intercalate "," stateToSym<>"};\
-    \return names[state];\
-  \}\
-  \static const std::Text expectedSym(std::size_t state) {\
-    \static constexpr const char* names[] = {"<>T.intercalate "," expectedSymbols<>"};\
-    \return names[state];\
-  \}\
-  \const std::size_t "<>name<>"::Action["<>tshow (length states)<>"]["
-    <>tshow (length tokens)<>"] = {" <> actionTable <> "};\
-  \const std::size_t "<>name<>"::GOTO["<>tshow (length states)<>"]["
-    <>tshow (length nonTerminals)<>"] = {" <> gotoTable <> "};\
-  \std::size_t "<>name<>"::top() const { return stack.empty() ? 0 : stack.top().first; }\
-  \"<>name<>"::"<>name<>"(Lexer *lex, bool debug):lex(lex),debug(debug) {}\
-  \ResultType "<>name<>"::parse() {\
-    \Token a = lex->getNextToken();\
-    \while (true) {\
-      \auto action = Action[top()][static_cast<std::size_t>(a.type)];\
-      \switch (action) {\
-      \"<> foldMap writeAction actionsMapList <> "\
-      \default:\
-        \if(debug)std::cerr<<\"Shift to \"<<action<<std::endl;\
-        \stack.push({action, a});\
-        \a=lex->getNextToken();\
-        \break;\
-      \}\
-    \}\
-  \}\n")]
+    , (base <> ".h", [I.i|
+#ifndef #{headerName}_H
+#define #{headerName}_H
+#include "lexer.h"
+#include "parseResult.h"
+#include <stack>
+#include <variant>
+class #{name} {
+  Lexer *lex;
+  bool debug;
+  std::stack<std::pair<std::size_t,std::variant<ResultType,Token>>> stack;
+  static const std::size_t Action[#{statesLenStr}][#{termLenStr}];
+  static const std::size_t GOTO[#{statesLenStr}][#{nonTermLenStr}];
+  std::size_t top() const;
+public:
+  #{name}(Lexer *lex, bool debug = false);
+  ResultType parse();
+};
+#endif
+|]) , (base <> ".cpp", [I.i|
+  #include "#{baseText}.h"
+  #include <stdexcept>
+  #include <iostream>
+  static const std::string stateToString(std::size_t state) {
+    static constexpr const char* names[] = {#{stateToString}};
+    return names[state];
+  }
+  static const std::string expectedSym(std::size_t state) {
+    static constexpr const char* names[] = {#{expectedSym}};
+    return names[state];
+  }
+  const std::size_t #{name}::Action[#{statesLenStr}][#{termLenStr}] = { #{actionTable} };
+  const std::size_t #{name}::GOTO[#{statesLenStr}][#{nonTermLenStr}] = { #{gotoTable} };
+  std::size_t #{name}::top() const { return stack.empty() ? 0 : stack.top().first; }
+  #{name}::#{name}(Lexer *lex, bool debug):lex(lex),debug(debug) {}
+  ResultType #{name}::parse() {
+    Token a = lex->getNextToken();
+    while (true) {
+      auto action = Action[top()][static_cast<std::size_t>(a.type)];
+      switch (action) {
+      #{actionCases}
+      default:
+        if(debug)std::cerr<<"Shift to "<<action<<std::endl;
+        stack.push({action, a});
+        a=lex->getNextToken();
+        break;
+      }
+    }
+  }|])]
   where
+  statesLenStr = tshow (length states)
+  termLenStr = tshow (length tokens)
+  nonTermLenStr = tshow (length nonTerminals)
+  headerName = T.map toUpper name
+  baseText = T.pack base
+  stateToString = T.intercalate "," stateToSym
+  expectedSym = T.intercalate "," expectedSymbols
+  actionCases = foldMap writeAction actionsMapList
   make2dTableM mkcell rows cols = T.intercalate "," <$> mapM mkrow rows
         where mkrow row = ("{"<>) . (<>"}") . T.intercalate "," <$> mapM (mkcell row) cols
   mkGotoTableCell st nt = return . maybe "0" tshow $
@@ -194,12 +200,12 @@ writeLRParser base name tokens r t = do
     (x:xs) -> reportConflicts st tok (x:|xs) >> return x
   reportConflicts st tok (x:|xs) = do
     tell $
-      "Conflicts detected in state " <> stateIndex st <> " with token " <> showSymbol tok <> "."
+      [interp'|Conflicts detected in state #{stateIndex st} with token #{showSymbol tok}.|]
       : map showAction (x:xs)
     tell ["Will use " <> showAction x]
   stateIndex st = tshow $ fromJust $ M.lookup st statesMap
   showAction (Shift n) = "Shift to state " <> tshow n
-  showAction (Reduce ((h, b), _)) = "Reduce " <> h <> " -> " <> showBody b
+  showAction (Reduce ((h, b), _)) = [interp'|Reduce #{h} -> #{showBody b}|]
   showAction Reject = "Reject"
   possibleActions st tok = shiftActions st tok <> reduceActions st tok
   shiftActions st tok
@@ -211,40 +217,40 @@ writeLRParser base name tokens r t = do
     | ps <- mapMaybe pointAction . filter (`lookaheadMatches` tok) $ S.toList (pointClosure r st)
     = map Reduce ps
   writeAction (Shift _, _) = ""
-  writeAction (a, n) = "case " <> tshow n <> ": "
-    <> actionBody a
-    <> "break;"
-  actionBody Reject = "{\
-      \std::Text parsed=stateToString(top());\
-      \auto lastSt = top();\
-      \while(!stack.empty()) { stack.pop(); parsed = stateToString(top()) + \" \" + parsed; }\
-      \throw std::runtime_error(\
-      \\"Rejection state reached after parsing \\\"\"+parsed+\"\\\", when encoutered symbol \\\"\" \
-      \+ ::to_string(a.type) + \"\\\" in state \" \
-      \+ std::to_string(lastSt) + \". Expected \\\"\" + expectedSym(lastSt) +\"\\\"\");\
-      \}"
-  actionBody (Shift st) = "\
-    \stack.push("<> tshow st <>");\
-    \a = lex->getNextToken();\
-  \"
+  writeAction (a, n) = [interp|
+  case #{tshow n}:
+    #{actionBody a}
+    break;
+  |] :: Text
+  actionBody Reject = [interp|{
+      std::string parsed=stateToString(top());
+      auto lastSt = top();
+      while(!stack.empty()) { stack.pop(); parsed = stateToString(top()) + " " + parsed; }
+      throw std::runtime_error(
+        "Rejection state reached after parsing \\""+parsed+"\\", when encoutered symbol \\""
+        + ::to_string(a.type) + "\\" in state "
+        + std::to_string(lastSt) + ". Expected \\"" + expectedSym(lastSt) +"\\"");
+    }|] :: Text
+  actionBody (Shift st) = [interp|
+    stack.push(#{tshow st});
+    a = lex->getNextToken();|]
   actionBody (Reduce ((ExtendedStartRule, _), _)) = "return std::get<0>(stack.top().second);"
-  actionBody (Reduce ((h, body), mcode)) = "{"
-    <> "if(debug) std::cerr << \"Reduce using "<> h <>" -> "<>showBody body<>";\\n\";"
-    <> T.concat (reverse $ zipWith showArg body [1::Word ..])
-    <> "auto gt = " <> goto <> ";"
-    <> "if(gt==0) throw std::runtime_error(\"No goto\");"
-    <> "if(debug) std::cerr << top() << \" is now on top of the stack;\\n\""
-    <> "<< gt <<\" will be placed on the stack\" << std::endl;"
-    <> "stack.push({gt,"<>result<>"});"
-    <> "}"
+  actionBody (Reduce ((h, body), mcode)) = [interp|{
+    if(debug) std::cerr << "Reduce using #{h} -> #{showBody body}\\n";
+    #{T.concat (reverse $ zipWith showArg body [1::Word ..])}
+    auto gt = GOTO[top()][#{tshow (nonTermIdx h)} /*#{h}*/];
+    if(gt==0) throw std::runtime_error("No goto");
+    if(debug) std::cerr << top() << " is now on top of the stack;\\n"
+                        << gt << " will be placed on the stack" << std::endl;
+    stack.push({gt,#{result}});
+    }|]
     where
       result :: Text
       result
         | Just code <- mcode
-        = "([]("<>argDefs<>") {" <> code <> "})("<>args<>")"
+        = [interp|([](#{argDefs}) { #{code} })(#{args})|]
         | otherwise
         = "ResultType()"
-      goto = "GOTO[top()]["<>tshow (nonTermIdx h)<>"/*"<>h<>"*/]"
       argDefs = T.intercalate "," $ zipWith showArgDef body [1::Word ..]
       args = T.intercalate "," $ zipWith showCallArg body [1::Word ..]
       showArgDef _ i = "const auto &_" <> tshow i
