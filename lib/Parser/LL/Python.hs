@@ -50,12 +50,12 @@ class #{className}:
                     self.resultStack.append(a)
                     a = self.lex.getNextToken()
                 else:
-                    raise Exception(f"Found terminal {a.type} but expected {X}.")
+                    raise Exception(f"Found terminal {a.type.name} but expected {X.name}.")
             elif isinstance(X,NonTerminal):
                 trans = self.M[int(X)][int(a.type)]
                 self.stack.append(trans)
                 if trans == 0:
-                    raise Exception(f"No transition for {X}, {a.type}")
+                    raise Exception(f"No transition for {X.name}, {a.type.name}")
                 #{indent 4 $ T.intercalate "\n" bodies}
             elif isinstance(X, int):
                 #{indent 4 $ T.intercalate "\nel" actions}
@@ -80,7 +80,7 @@ class #{className}:
     actions = map (uncurry makeAction) actionList
     makeBody (b, _) n = [interp|
       elif trans == #{showIdx n}:
-          if self.debug: print(f"{X} -> #{showBody b}")
+          if self.debug: print(f"{X.name} -> #{showBody b}")
           #{indent 1 . T.intercalate "\n" $ map pushSymbol (reverse b)}
       |] :: Text
     pushSymbol s = [interp|self.stack.append(#{encodeSymbol s})|] :: Text

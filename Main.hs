@@ -67,11 +67,11 @@ main = do
       , parserOptionsBaseFileName = "lalrParser"
       , parserOptionsGrammarDefinition = grammar
     }
-    -- wrap "LL(1) parser" $ makeLLParser grammar "llParser" tokens
-    -- wrap "LR(0) parser" $ makeLRParser (Proxy :: Proxy LR0Point) grammar "lr0Parser" "ParserLR0" tokens
-    -- wrap "LR(1) parser" $ makeLRParser (Proxy :: Proxy LR1Point) grammar "lr1Parser" "ParserLR1" tokens
-    -- wrap "SLR parser" $ makeLRParser (Proxy :: Proxy SLRPoint) grammar "slrParser" "ParserSLR" tokens
-    -- wrap "LALR parser" $ makeLALRParser grammar "lalrParser" "ParserLALR" tokens
+    wrap "LALR parser" $ makeParser python lalrParser ParserOptions{
+        parserOptionsName = "LALRParser"
+      , parserOptionsBaseFileName = "lalrParser"
+      , parserOptionsGrammarDefinition = grammar
+    }
   return ()
 
 wrap n m =
