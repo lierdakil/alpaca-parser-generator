@@ -5,8 +5,9 @@ import Data.Text (Text)
 import Regex.Parse
 import Lexer.FA
 import Data.List.NonEmpty (NonEmpty)
+import Lang
 
-class LexerWriter lang where
+class Lang lang => LexerWriter lang where
   writeLexer :: Proxy lang
     -> [(Int, (Maybe Text, Action))] -- accepting states
     -> [Text] -- token names

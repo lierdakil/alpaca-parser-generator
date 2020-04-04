@@ -5,6 +5,7 @@ import Data.Proxy
 import Data.Text (Text)
 import Grammar
 import MonadTypes
+import Lang
 
 data ParserOptions g = ParserOptions {
     parserOptionsName :: Text
@@ -15,7 +16,7 @@ data ParserOptions g = ParserOptions {
 class Parser parser where
   buildParser :: Monad m => Proxy parser -> ParserOptions Rules -> MyMonadT m ([(FilePath,Text)], parser)
 
-class ParserWriter parser lang where
+class (Parser parser, Lang lang) => ParserWriter parser lang where
   writeParser :: forall a. Proxy lang -> Text -> ParserOptions a -> parser -> [(FilePath,Text)]
 
 makeParser :: (Parser parser, ParserWriter parser lang, Monad m) => Proxy lang -> Proxy parser

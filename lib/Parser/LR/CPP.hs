@@ -56,8 +56,12 @@ static const std::string expectedSym(std::size_t state) {
   static constexpr const char* names[] = {#{expectedSym}};
   return names[state];
 }
-const std::size_t #{name}::Action[#{statesLenStr}][#{termLenStr}] = { #{actionTable} };
-const std::size_t #{name}::GOTO[#{statesLenStr}][#{nonTermLenStr}] = { #{gotoTable} };
+const std::size_t #{name}::Action[#{statesLenStr}][#{termLenStr}] = {
+  #{indent 1 actionTable}
+};
+const std::size_t #{name}::GOTO[#{statesLenStr}][#{nonTermLenStr}] = {
+  #{indent 1 gotoTable}
+};
 std::size_t #{name}::top() const { return stack.empty() ? 0 : stack.top().first; }
 #{name}::#{name}(Lexer *lex, bool debug):lex(lex),debug(debug) {}
 ResultType #{name}::parse() {
@@ -65,7 +69,7 @@ ResultType #{name}::parse() {
   while (true) {
     auto action = Action[top()][static_cast<std::size_t>(a.type)];
     switch (action) {
-    #{actionCases}
+    #{indent 2 actionCases}
     default:
       if(debug)std::cerr<<"Shift to "<<action<<std::endl;
       stack.push({action, a});
@@ -75,6 +79,7 @@ ResultType #{name}::parse() {
   }
 }|])]
     where
+    indent = indentLang 2
     base = parserOptionsBaseFileName
     name = parserOptionsName
     tokens = lrTerminals
@@ -106,35 +111,33 @@ ResultType #{name}::parse() {
             return i
     stateToString = T.intercalate "," $ "\"·\"" : map (quote . showSymbol) (M.elems lrStateSym)
     expectedSym = T.intercalate "," $ map (quote . T.intercalate "/") $ M.elems lrExpected
-    actionCases = foldMap writeAction $ M.toList actionsMap
-    writeAction (Shift _, _) = ""
-    writeAction (a, n) = [interp|
-    case #{tshow n}:
-      #{actionBody a}
-      break;
-    |] :: Text
-    actionBody Reject = [interp|{
-        std::string parsed=stateToString(top());
-        auto lastSt = top();
-        while(!stack.empty()) { stack.pop(); parsed = stateToString(top()) + " " + parsed; }
-        throw std::runtime_error(
-          "Rejection state reached after parsing \\""+parsed+"\\", when encoutered symbol \\""
-          + ::to_string(a.type) + "\\" in state "
-          + std::to_string(lastSt) + ". Expected \\"" + expectedSym(lastSt) +"\\"");
-      }|] :: Text
-    actionBody (Shift st) = [interp|
-      stack.push(#{tshow st});
-      a = lex->getNextToken();|]
+    actionCases = T.intercalate "\n" $ mapMaybe writeAction $ M.toList actionsMap
+    writeAction (Shift _, _) = Nothing
+    writeAction (a, n) = Just [interp|
+    case #{tshow n}: {
+        #{indent 2 $ actionBody a}
+      } break;
+    |] :: Maybe Text
+    actionBody Reject = [interp|
+      std::string parsed=stateToString(top());
+      auto lastSt = top();
+      while(!stack.empty()) { stack.pop(); parsed = stateToString(top()) + " " + parsed; }
+      throw std::runtime_error(
+        "Rejection state reached after parsing \\""+parsed+"\\", when encoutered symbol \\""
+        + ::to_string(a.type) + "\\" in state "
+        + std::to_string(lastSt) + ". Expected \\"" + expectedSym(lastSt) +"\\"");
+      |] :: Text
+    actionBody (Shift _) = error "does not happen"
     actionBody (Reduce ((ExtendedStartRule, _), _)) = "return std::get<0>(stack.top().second);"
-    actionBody (Reduce ((h, body), mcode)) = [interp|{
+    actionBody (Reduce ((h, body), mcode)) = [interp|
       if(debug) std::cerr << "Reduce using #{h} -> #{showBody body}\\n";
-      #{T.concat (reverse $ zipWith showArg body [1::Word ..])}
+      #{T.intercalate "\n" (reverse $ zipWith showArg body [1::Word ..])}
       auto gt = GOTO[top()][#{tshow (nonTermIdx (NonTerm h))} /*#{h}*/];
       if(gt==0) throw std::runtime_error("No goto");
       if(debug) std::cerr << top() << " is now on top of the stack;\\n"
                           << gt << " will be placed on the stack" << std::endl;
       stack.push({gt,#{result}});
-      }|]
+      |]
       where
         result :: Text
         result
