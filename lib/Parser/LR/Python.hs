@@ -55,7 +55,7 @@ class #{name}:
     def parse(self):
         a = self.lex.getNextToken()
         while True:
-            action = self.Action[self.top()][int(a.type)]
+            action = self.Action[self.top()][int(a[0])]
             #{indent 3 $ T.intercalate "\nel" actionCases}
             else:
                 if self.debug: print(f"Shift to {action}")
@@ -102,7 +102,7 @@ class #{name}:
           self.stack.pop()
           parsed = stateToString(self.top()) + " " + parsed
       raise Exception(
-        f'Rejection state reached after parsing "{parsed}", when encoutered symbol "{a.type.name}" in state {lastSt}. Expected "{expectedSym(lastSt)}"')
+        f'Rejection state reached after parsing "{parsed}", when encoutered symbol "{a[0].name}" in state {lastSt}. Expected "{expectedSym(lastSt)}"')
       |] :: Text
     actionBody (Shift _) = error "does not happen"
     actionBody (Reduce ((ExtendedStartRule, _), _)) = "return self.stack.pop()[1]"

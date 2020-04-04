@@ -20,7 +20,7 @@ class TokenType(IntEnum):
     #{indent 1 tokDefns}
 
 class Lexer:
-    def __init__(self, input, mkToken, debug = False):
+    def __init__(self, input, mkToken = lambda x, y: (x, y), debug = False):
         self.input = input
         self.curChIx = 0
         self.debug = debug

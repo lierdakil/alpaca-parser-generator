@@ -62,7 +62,7 @@ class #{parserOptionsName}:
       |] where alts' = map (A.first fromJust) $ filter (isJust . fst) alts
                alt | Just res <- lookup Nothing alts = uncurry makeBody res
                    | otherwise = [interp|
-                      raise Exception("No alternative matched while parsing nonterminal #{h}:" + str(self.curTok.type));
+                      raise Exception("No alternative matched while parsing nonterminal #{h}:" + str(self.curTok[0]));
                       |]
 
     makeBody :: Body -> Maybe Text -> Text
@@ -74,7 +74,7 @@ class #{parserOptionsName}:
 
     makeAlt :: Lookahead -> (Body, Maybe Text) -> Text
     makeAlt s (b, act) = [interp|
-        if self.curTok.type == TokenType.#{tok s}:
+        if self.curTok[0] == TokenType.#{tok s}:
             #{indent 1 $ makeBody b act}
         |]
 
@@ -91,8 +91,8 @@ class #{parserOptionsName}:
       (NonTerm nt, DoesNotReturnValue)
         -> [interp|self.parse_#{nt}();|]
       (s', _) -> [interp|
-        if self.curTok.type != TokenType.#{tok s'}:
-            raise Exception("Expected token #{tok s'}, but got " + str(curTok.type))
+        if self.curTok[0] != TokenType.#{tok s'}:
+            raise Exception("Expected token #{tok s'}, but got " + str(curTok[0]))
         _#{n} = self.curTok
         self.curTok = self.lex.getNextToken()
         |]

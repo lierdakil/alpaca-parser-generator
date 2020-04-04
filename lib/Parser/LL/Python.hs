@@ -46,16 +46,16 @@ class #{className}:
         while len(self.stack) > 0:
             X = self.stack.pop()
             if isinstance(X, TokenType):
-                if a.type == X:
+                if a[0] == X:
                     self.resultStack.append(a)
                     a = self.lex.getNextToken()
                 else:
-                    raise Exception(f"Found terminal {a.type.name} but expected {X.name}.")
+                    raise Exception(f"Found terminal {a[0].name} but expected {X.name}.")
             elif isinstance(X,NonTerminal):
-                trans = self.M[int(X)][int(a.type)]
+                trans = self.M[int(X)][int(a[0])]
                 self.stack.append(trans)
                 if trans == 0:
-                    raise Exception(f"No transition for {X.name}, {a.type.name}")
+                    raise Exception(f"No transition for {X.name}, {a[0].name}")
                 #{indent 4 $ T.intercalate "\n" bodies}
             elif isinstance(X, int):
                 #{indent 4 $ T.intercalate "\nel" actions}
