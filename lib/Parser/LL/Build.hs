@@ -29,19 +29,21 @@ instance Parser LLParser where
   --buildParser :: Monad m => Proxy parser -> Grammar -> MyMonadT m parser
   buildParser _ = buildLLParser
 
-buildLLParser :: Monad m => Rules -> MyMonadT m LLParser
-buildLLParser rules = do
+buildLLParser :: Monad m => ParserOptions Rules -> MyMonadT m ([(FilePath, Text)],LLParser)
+buildLLParser ParserOptions{..} = do
   tokens <- get
   lr <- isLeftRecursive r
   when lr $ throwError ["LL(1) parser can not handle left-recursive grammar"]
   cells <- M.fromList . concat <$> mapM (fmap catMaybes . forM tokens . writeCell) nonTerms
-  return LLParser{
+  let debug = [(parserOptionsBaseFileName <> ".txt", printTable t)]
+  return (debug, LLParser{
       llStartSymbol = startSymbol
     , llTerminals = tokens
     , llNonTerminals = map NonTerm nonTerms
     , llActions = cells
-    }
+    })
   where
+  rules = parserOptionsGrammarDefinition
   writeCell nonterm term
     | Just (act, b:rest) <- M.lookup (NonTerm nonterm, term) tt
     = do
@@ -63,13 +65,13 @@ printTable t = T.pack $ tableString (repeat def) unicodeS (titlesH $ map T.unpac
   where
   nonTerms = S.toList . S.fromList $ map (fst . fst) tl
   terms = S.toList $ S.unions $ map fst $ M.elems t
-  titles = "" : map showSymbol terms
+  titles = "" : map showSymbol nonTerms
   tl = M.toList t
   tt = M.fromListWith (++) $ foldMap r2t tl
   r2t ((nt, b), (ts, _)) = map (\term -> ((nt, term), [b])) $ S.toList ts
-  rows = map makeRow nonTerms
-  makeRow nonTerm = colsAllG top $ [T.unpack $ showSymbol nonTerm] : map (makeCell nonTerm) terms
-  makeCell nonTerm term
+  rows = map makeRow terms
+  makeRow term = colsAllG top $ [T.unpack $ showSymbol term] : map (makeCell term) nonTerms
+  makeCell term nonTerm
     | Just cell <- M.lookup (nonTerm, term) tt = map showBody' cell
     | otherwise = []
   showBody' [] = "ε"

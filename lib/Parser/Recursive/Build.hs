@@ -15,10 +15,10 @@ import qualified Control.Arrow as A
 
 instance Parser RecursiveParser where
   --buildParser :: Monad m => Grammar -> MyMonadT m parser
-  buildParser _ rules = do
-    lr <- isLeftRecursive (mkRulesMap rules)
+  buildParser _ ParserOptions{..} = do
+    lr <- isLeftRecursive (mkRulesMap parserOptionsGrammarDefinition)
     when lr $ throwError ["Recursive parser can not handle left-recursive grammar"]
-    buildRecursiveParser rules
+    (,) [] <$> buildRecursiveParser parserOptionsGrammarDefinition
 
 newtype RecursiveParser = RecursiveParser {
     recursiveParserParsers :: NonEmpty RecursiveParserItem
