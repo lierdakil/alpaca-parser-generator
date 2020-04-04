@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings, ScopedTypeVariables, QuasiQuotes, RecordWildCards #-}
 module Parser.Recursive (
     module Parser.Types
   , module Lang

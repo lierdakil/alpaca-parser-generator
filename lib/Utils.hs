@@ -8,8 +8,6 @@ import Data.List
 import qualified Data.Text as T
 import qualified Data.String.Interpolate as I
 
-data Lang = CPP | Python
-
 tshow :: Show a => a -> Text
 tshow = pack . show
 
@@ -26,10 +24,7 @@ interp = I.i{quoteExp = quoteExp I.i . unindent }
 interp' :: QuasiQuoter
 interp' = I.i
 
-indentLang :: Lang -> Int -> Text -> Text
-indentLang lang n s = T.intercalate "\n" $ case T.lines s of
-  (x:xs) -> x : map (T.replicate (n*is lang) " " <>) xs
+indentLang :: Word -> Word -> Text -> Text
+indentLang indentSize n s = T.intercalate "\n" $ case T.lines s of
+  (x:xs) -> x : map (T.replicate (fromIntegral $ n*indentSize) " " <>) xs
   [] -> []
-  where
-  is Python = 4
-  is _ = 2

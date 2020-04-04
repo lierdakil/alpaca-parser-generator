@@ -40,7 +40,7 @@ class #{parserOptionsName}:
     RecursiveParserItem recursiveParserStartRule startRuleDoesReturn _ :| _ = recursiveParserParsers
     basename = parserOptionsBaseFileName
     headerName = map toUpper basename
-    indent = indentLang Python
+    indent = indentLang 4
     parsers :: [Text]
     parsers = map makeOneParser $ NE.toList recursiveParserParsers
 

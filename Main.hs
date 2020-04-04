@@ -19,17 +19,14 @@ main :: IO ()
 main = do
   [inputFile] <- getArgs
   input <- T.readFile inputFile
-  let (lexic, _:grammarLines) = break (=="%%") $ T.lines input
+  let (lexicRaw, _:grammarLines) = break (=="%%") $ T.lines input
       rootdir = takeDirectory inputFile
       grammar = T.unlines grammarLines
+      lexic = filter (not . T.null) lexic
   setCurrentDirectory rootdir
   runInIO $ do
-    (debug, dfa) <- makeDFA (filter (not . T.null) lexic)
-    writeFiles debug
-    (tokens, lexer) <- writeLexer dfa CPP
-    writeFiles lexer
-    (_, lexer) <- writeLexer dfa Python
-    writeFiles lexer
+    writeFiles =<< makeLexer cpp lexic
+    writeFiles =<< makeLexer python lexic
     wrap "recursive parser" $ makeParser cpp recursiveParser ParserOptions{
         parserOptionsName = "Parser"
       , parserOptionsBaseFileName = "recursiveParser"
@@ -51,4 +48,4 @@ wrap n m =
   censor (map (("Warning in "<>n<>": ")<>)) (writeFiles =<< m)
     `catchError`
     (tell . map (("Error in "<>n<>": ")<>))
-writeFiles = mapM_ (lift . lift . uncurry T.writeFile)
+writeFiles = mapM_ (lift . lift . lift . uncurry T.writeFile)

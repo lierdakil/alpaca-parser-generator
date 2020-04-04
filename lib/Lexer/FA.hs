@@ -1,5 +1,5 @@
 {-# LANGUAGE TupleSections, OverloadedStrings #-}
-module FA (
+module Lexer.FA (
     StateAttr
   , NFA
   , DFA

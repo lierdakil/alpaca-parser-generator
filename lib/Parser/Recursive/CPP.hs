@@ -52,7 +52,7 @@ public:
     RecursiveParserItem recursiveParserStartRule startRuleDoesReturn _ :| _ = recursiveParserParsers
     basename = parserOptionsBaseFileName
     headerName = map toUpper basename
-    indent = indentLang CPP
+    indent = indentLang 2
     parsers :: [(Text, Text)]
     parsers = map makeOneParser $ NE.toList recursiveParserParsers
 
