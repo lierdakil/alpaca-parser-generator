@@ -1,36 +1,21 @@
 {-# LANGUAGE TypeFamilies
-           , TypeApplications
-           , GeneralizedNewtypeDeriving
-           , UndecidableInstances
            , FlexibleContexts
            , OverloadedStrings
            #-}
-module Parser.LR.LALR (makeLALRParser) where
+module Parser.LR.LALR(LALRPoint) where
 
 import Grammar
-import Parser.LR.Build
+import Parser.LR.Point
 import qualified Data.Set as S
 import qualified Data.Map as M
 import Data.List
 import Data.Maybe
-import Data.List.NonEmpty (NonEmpty(..), (<|))
+import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 import MonadTypes
-import Data.Text (Text)
 import Utils
 
-makeLALRParser :: (Monad m)
-             => Text -> FilePath -> Text -> [Symbol]
-             -> MyMonadT m [(FilePath,Text)]
-makeLALRParser input base name tokens
-  = do
-    Grammar top rules <- parse input
-    let Rule start _ :| _ = rules
-        r = mkRulesMap (Rule ExtendedStartRule (([NonTerm start], Nothing) :| []) <| rules)
-    automaton <- lalrify $ buildLRAutomaton @LR1Point start r
-    writeLRParser base name tokens top r automaton
-
-lalrify :: Monad m => LRAutomaton LR1Point -> MyMonadT m (LRAutomaton LALRPoint)
+lalrify :: Monad m => LRAutomaton LALRPoint -> MyMonadT m (LRAutomaton LALRPoint)
 lalrify t = (,) (lookup' (fst t)) . M.fromAscList
     <$> mapM ensureUnique (NE.groupAllWith fst (map conv tl))
   where
@@ -51,11 +36,11 @@ lalrify t = (,) (lookup' (fst t)) . M.fromAscList
       . map mkLalr
       . NE.groupAllWith (S.map lr0)
       $ states
-    mkLalr :: NonEmpty (LRState LR1Point) -> (LRState LR0Point, LRState LALRPoint)
+    mkLalr :: NonEmpty (LRState LALRPoint) -> (LRState LR0Point, LRState LALRPoint)
     mkLalr (x :| xs) = (S.map lr0 x, combined (x:|xs))
-      where combined :: NonEmpty (S.Set LR1Point) -> S.Set LALRPoint
-            combined = S.fromList . map combine . transpose' . NE.map S.toList
-            combine (p1:|ps) = LALRPoint $ p1{
+      where combined :: NonEmpty (S.Set LALRPoint) -> S.Set LALRPoint
+            combined = S.fromList . map (LALRPoint . combine . fmap lr1Point) . transpose' . NE.map S.toList
+            combine (p1:|ps) = p1{
               lr1PointLookahead = S.unions (map lr1PointLookahead (p1:ps))
             }
             transpose' :: NonEmpty [a] -> [NonEmpty a]
@@ -65,4 +50,17 @@ lalrify t = (,) (lookup' (fst t)) . M.fromAscList
 
 newtype LALRPoint = LALRPoint {
     lr1Point :: LR1Point
-  } deriving (Show,Eq,Ord,LRPoint)
+  } deriving (Show,Eq,Ord)
+
+instance LRPoint LALRPoint where
+    type Lookahead LALRPoint = Symbol
+    lr0 = lr0 . lr1Point
+    modLr0 p v = LALRPoint $ (modLr0 . lr1Point) p v
+    pointLookahead = pointLookahead . lr1Point
+    modLookahead p v = LALRPoint $ (modLookahead . lr1Point) p v
+    startPoint rule = LALRPoint $ startPoint rule
+    makeFirstPoint r p h b beta act
+      = LALRPoint $ makeFirstPoint r (lr1Point p) h b beta act
+    lookaheadMatches = lookaheadMatches . lr1Point
+    showLookahead = showLookahead . lr1Point
+    postprocess = lalrify

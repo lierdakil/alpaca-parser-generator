@@ -4,7 +4,7 @@ module Main where
 import Lexer
 import Parser.Recursive
 import Parser.LL
--- import ParseLR
+import Parser.LR
 -- import ParseSLR
 -- import ParseLALR
 import System.Environment
@@ -45,6 +45,26 @@ main = do
     wrap "LL(1) parser" $ makeParser python llParser ParserOptions{
         parserOptionsName = "LLParser"
       , parserOptionsBaseFileName = "llParser"
+      , parserOptionsGrammarDefinition = grammar
+    }
+    wrap "LR(0) parser" $ makeParser cpp lr0Parser ParserOptions{
+        parserOptionsName = "LR0Parser"
+      , parserOptionsBaseFileName = "lr0Parser"
+      , parserOptionsGrammarDefinition = grammar
+    }
+    wrap "LR(1) parser" $ makeParser cpp lr1Parser ParserOptions{
+        parserOptionsName = "LR1Parser"
+      , parserOptionsBaseFileName = "lr1Parser"
+      , parserOptionsGrammarDefinition = grammar
+    }
+    wrap "SLR parser" $ makeParser cpp slrParser ParserOptions{
+        parserOptionsName = "SLRParser"
+      , parserOptionsBaseFileName = "slrParser"
+      , parserOptionsGrammarDefinition = grammar
+    }
+    wrap "LALR parser" $ makeParser cpp lalrParser ParserOptions{
+        parserOptionsName = "LALRParser"
+      , parserOptionsBaseFileName = "lalrParser"
       , parserOptionsGrammarDefinition = grammar
     }
     -- wrap "LL(1) parser" $ makeLLParser grammar "llParser" tokens

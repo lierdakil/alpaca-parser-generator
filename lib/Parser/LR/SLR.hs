@@ -2,7 +2,7 @@
 module Parser.LR.SLR where
 
 import Grammar
-import Parser.LR.Build
+import Parser.LR.Point
 import qualified Data.Set as S
 import Data.Function
 import qualified Data.Text as T

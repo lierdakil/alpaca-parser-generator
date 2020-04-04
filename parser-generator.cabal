@@ -48,6 +48,7 @@ library
                      , Parser.LR.Python
                      , Parser.LR.SLR
                      , Parser.LR.LALR
+                     , Parser.LR.Point
   build-depends:       base >= 4 && < 5
                      , containers
                      , mtl
