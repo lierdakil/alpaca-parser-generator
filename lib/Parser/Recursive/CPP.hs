@@ -108,6 +108,6 @@ public:
       (s', _) -> [interp|
         if(curTok.type != TokenType::#{tok s'})
           throw std::runtime_error("Expected token #{tok s'}, but got " + to_string(curTok.type));
-        auto _#{n} = curTok;
+        auto _#{n} = std::move(curTok);
         curTok = lex->getNextToken();
         |]

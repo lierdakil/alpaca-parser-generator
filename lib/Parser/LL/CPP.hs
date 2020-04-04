@@ -70,7 +70,7 @@ ResultType #{className}::parse() {
           using T = std::decay_t<decltype(X)>;
           if constexpr (std::is_same_v<T, TokenType>) {
             if (a.type == X) {
-              resultStack.push(a);
+              resultStack.push(std::move(a));
               a = lex->getNextToken();
               stack.pop();
             } else {
@@ -96,7 +96,7 @@ ResultType #{className}::parse() {
           }
         }, stack.top());
   }
-  return std::get<0>(resultStack.top());
+  return std::move(std::get<0>(resultStack.top()));
 }
 |]
     indent = indentLang 2
@@ -135,14 +135,14 @@ ResultType #{className}::parse() {
             = [interp|resultStack.push(ResultType());|]
         argDefs = T.intercalate "," $ zipWith showArgDef body [1::Word ..]
         args = T.intercalate "," $ zipWith showCallArg body [1::Word ..]
-        showArgDef _ i = "const auto &_" <> tshow i
-        showCallArg _ i = "_" <> tshow i
+        showArgDef _ i = [interp|auto &&_$#{i}|]
+        showCallArg _ i = [interp|std::move(_#{i})|]
         showArg (NonTerm _) i = [interp|
-          auto _#{tshow i}=std::get<0>(resultStack.top());
+          auto _#{tshow i}=std::move(std::get<0>(resultStack.top()));
           resultStack.pop();
           |]
         showArg _ i = [interp|
-          auto _#{tshow i}=std::get<1>(resultStack.top());
+          auto _#{tshow i}=std::move(std::get<1>(resultStack.top()));
           resultStack.pop();
           |]
 
