@@ -47,7 +47,6 @@ public:
 #include "#{baseText}.h"
 #include <stdexcept>
 #include <iostream>
-#{gtop}
 static const std::string stateToString(std::size_t state) {
   static constexpr const char* names[] = {#{stateToString}};
   return names[state];

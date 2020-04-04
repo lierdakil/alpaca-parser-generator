@@ -48,8 +48,8 @@ public:
 #include <stdexcept>
 #include <iostream>
 const std::string to_string(TokenType tt){
-static constexpr const char *names[] = { #{tokReflect} };
-return names[static_cast<std::size_t>(tt)];
+  static constexpr const char *names[] = { #{tokReflect} };
+  return names[static_cast<std::size_t>(tt)];
 }
 #if __has_include("token.h")
 #else

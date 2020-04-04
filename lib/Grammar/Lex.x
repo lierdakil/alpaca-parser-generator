@@ -13,6 +13,7 @@ tokens :-
 <0> \%eof                { mkTok $ const TTermEof }
 <0> \-\>                 { mkTok $ const TArrow }
 <0> \:?\:?\=             { mkTok $ const TArrow }
+<0> \:                   { mkTok $ const TArrow }
 <0> \|                   { mkTok $ const TAlternative }
 <0> \;                   { mkTok $ const TSep }
 <0> \{                   { begin action }

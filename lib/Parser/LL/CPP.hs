@@ -53,7 +53,6 @@ public:
 #include "#{basename}.h"
 #include <stdexcept>
 #include <iostream>
-#{gtop}
 const std::string #{className}::to_string(NonTerminal nt) {
   static constexpr const char *names[] = { #{T.intercalate "," (map quote nonTerms)} };
   return names[static_cast<std::size_t>(nt)];

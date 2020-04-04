@@ -41,7 +41,6 @@ public:
 #include "#{basename}.h"
 #include <stdexcept>
 #include <iostream>
-#{gtop}
 #{parserOptionsName}::#{parserOptionsName}(Lexer *lex, bool debug = false):lex(lex),debug(debug){
   curTok = lex->getNextToken();
 }
