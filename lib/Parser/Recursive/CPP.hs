@@ -21,12 +21,12 @@ import Lang
 
 instance ParserWriter RecursiveParser CPP where
   --writeParser :: forall a. Proxy lang -> ParserOptions a -> parser -> [(FilePath,Text)]
-  writeParser _ ParserOptions{..} RecursiveParser{..} =
+  writeParser _ gtop ParserOptions{..} RecursiveParser{..} =
     [(basename <> ".h", [interp|
 #ifndef #{headerName}_H
 #define #{headerName}_H
 #include "lexer.h"
-#{recursiveParserTop}
+#{gtop}
 class #{parserOptionsName} {
   Lexer *lex;
   Token curTok;
@@ -41,7 +41,7 @@ public:
 #include "#{basename}.h"
 #include <stdexcept>
 #include <iostream>
-#{recursiveParserTop}
+#{gtop}
 #{parserOptionsName}::#{parserOptionsName}(Lexer *lex, bool debug = false):lex(lex),debug(debug){
   curTok = lex->getNextToken();
 }

@@ -13,14 +13,15 @@ data ParserOptions g = ParserOptions {
   } deriving (Functor, Foldable, Traversable)
 
 class Parser parser where
-  buildParser :: Monad m => Proxy parser -> Grammar -> MyMonadT m parser
+  buildParser :: Monad m => Proxy parser -> Rules -> MyMonadT m parser
 
 class ParserWriter parser lang where
-  writeParser :: forall a. Proxy lang -> ParserOptions a -> parser -> [(FilePath,Text)]
+  writeParser :: forall a. Proxy lang -> Text -> ParserOptions a -> parser -> [(FilePath,Text)]
 
 makeParser :: (Parser parser, ParserWriter parser lang, Monad m) => Proxy lang -> Proxy parser
            -> ParserOptions Text -> MyMonadT m [(FilePath,Text)]
 makeParser l p opts = do
   grammar <- traverse parse opts
-  parser <- buildParser p (parserOptionsGrammarDefinition grammar)
-  return $ writeParser l opts parser
+  let Grammar gtop rules = parserOptionsGrammarDefinition grammar
+  parser <- buildParser p rules
+  return $ writeParser l gtop opts parser

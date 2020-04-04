@@ -14,8 +14,8 @@ import Utils
 instance LexerWriter Python where
   writeLexer _ accSt tokNames stList =
     [ ("lexer.py", [interp|
-from enum import Enum
-class TokenType(Enum):
+from enum import IntEnum
+class TokenType(IntEnum):
     eof = 0
     #{indent 1 tokDefns}
 

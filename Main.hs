@@ -3,7 +3,7 @@ module Main where
 
 import Lexer
 import Parser.Recursive
--- import ParseLL
+import Parser.LL
 -- import ParseLR
 -- import ParseSLR
 -- import ParseLALR
@@ -22,7 +22,7 @@ main = do
   let (lexicRaw, _:grammarLines) = break (=="%%") $ T.lines input
       rootdir = takeDirectory inputFile
       grammar = T.unlines grammarLines
-      lexic = filter (not . T.null) lexic
+      lexic = filter (not . T.null) lexicRaw
   setCurrentDirectory rootdir
   runInIO $ do
     writeFiles =<< makeLexer cpp lexic
@@ -35,6 +35,16 @@ main = do
     wrap "recursive parser" $ makeParser python recursiveParser ParserOptions{
         parserOptionsName = "Parser"
       , parserOptionsBaseFileName = "recursiveParser"
+      , parserOptionsGrammarDefinition = grammar
+    }
+    wrap "LL(1) parser" $ makeParser cpp llParser ParserOptions{
+        parserOptionsName = "LLParser"
+      , parserOptionsBaseFileName = "llParser"
+      , parserOptionsGrammarDefinition = grammar
+    }
+    wrap "LL(1) parser" $ makeParser python llParser ParserOptions{
+        parserOptionsName = "LLParser"
+      , parserOptionsBaseFileName = "llParser"
       , parserOptionsGrammarDefinition = grammar
     }
     -- wrap "LL(1) parser" $ makeLLParser grammar "llParser" tokens

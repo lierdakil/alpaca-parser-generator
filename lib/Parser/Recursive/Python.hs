@@ -21,10 +21,10 @@ import Lang
 
 instance ParserWriter RecursiveParser Python where
   --writeParser :: forall a. Proxy lang -> ParserOptions a -> parser -> [(FilePath,Text)]
-  writeParser _ ParserOptions{..} RecursiveParser{..} =
+  writeParser _ gtop ParserOptions{..} RecursiveParser{..} =
     [(basename <> ".py", [interp|
 from lexer import TokenType
-#{recursiveParserTop}
+#{gtop}
 class #{parserOptionsName}:
     def __init__(self, lexer, debug = False):
         self.lex = lexer

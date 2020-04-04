@@ -23,8 +23,6 @@ library
                      , Parser.Recursive
                      , Parser.LL
                      , Parser.LR
-                     , Parser.SLR
-                     , Parser.LALR
                      , Parser.Types
                      , MonadTypes
                      , Lang
@@ -42,6 +40,14 @@ library
                      , Parser.Recursive.Build
                      , Parser.Recursive.CPP
                      , Parser.Recursive.Python
+                     , Parser.LL.Build
+                     , Parser.LL.CPP
+                     , Parser.LL.Python
+                     , Parser.LR.Build
+                     , Parser.LR.CPP
+                     , Parser.LR.Python
+                     , Parser.LR.SLR
+                     , Parser.LR.LALR
   build-depends:       base >= 4 && < 5
                      , containers
                      , mtl

@@ -15,14 +15,13 @@ import qualified Control.Arrow as A
 
 instance Parser RecursiveParser where
   --buildParser :: Monad m => Grammar -> MyMonadT m parser
-  buildParser _ (Grammar top rules) = do
+  buildParser _ rules = do
     lr <- isLeftRecursive (mkRulesMap rules)
     when lr $ throwError ["Recursive parser can not handle left-recursive grammar"]
-    buildRecursiveParser top rules
+    buildRecursiveParser rules
 
-data RecursiveParser = RecursiveParser {
-    recursiveParserTop :: Text
-  , recursiveParserParsers :: NonEmpty RecursiveParserItem
+newtype RecursiveParser = RecursiveParser {
+    recursiveParserParsers :: NonEmpty RecursiveParserItem
   }
 
 data RecursiveParserItem = RecursiveParserItem{
@@ -39,12 +38,11 @@ data Body = Body Text [(Symbol, RecursiveParserItemDoesReturn)]
 type ActionableRules = S.Set Text
 type Lookahead = Symbol
 
-buildRecursiveParser :: Monad m => Text -> Rules -> MyMonadT m RecursiveParser
-buildRecursiveParser top rules = do
+buildRecursiveParser :: Monad m => Rules -> MyMonadT m RecursiveParser
+buildRecursiveParser rules = do
   parsers <- mapM makeRuleParser rules
   return RecursiveParser{
-      recursiveParserTop = top
-    , recursiveParserParsers = parsers
+      recursiveParserParsers = parsers
     }
   where
   doesReturn x | x `S.member` actionableRules = DoesReturnValue

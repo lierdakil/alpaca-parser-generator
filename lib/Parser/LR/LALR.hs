@@ -5,10 +5,10 @@
            , FlexibleContexts
            , OverloadedStrings
            #-}
-module Parser.LALR (makeLALRParser) where
+module Parser.LR.LALR (makeLALRParser) where
 
 import Grammar
-import Parser.LR
+import Parser.LR.Build
 import qualified Data.Set as S
 import qualified Data.Map as M
 import Data.List
