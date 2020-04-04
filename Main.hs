@@ -44,7 +44,7 @@ langReader = eitherReader go
         go "py" = Right $ \(ParserProxy p) -> LangParserProxy python p
         go _ = Left "Invalid value, allowed values: cpp, c++, python, py"
 
-data ParserProxy = forall l p. (Parser p, ParserWriter p CPP, ParserWriter p Python)
+data ParserProxy = forall p. (Parser p, ParserWriter p CPP, ParserWriter p Python)
                 => ParserProxy { unPP :: Proxy p }
 data LangParserProxy = forall l p. (Parser p, ParserWriter p l, LexerWriter l)
                     => LangParserProxy (Proxy l) (Proxy p)
