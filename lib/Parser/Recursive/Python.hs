@@ -14,7 +14,6 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Utils
 import Parser.Types
-import Data.Char
 import qualified Control.Arrow as A
 import Parser.Recursive.Build
 import Lang
@@ -37,9 +36,8 @@ class #{parserOptionsName}:
         return self.parse_#{recursiveParserStartRule}()
 |])]
     where
-    RecursiveParserItem recursiveParserStartRule startRuleDoesReturn _ :| _ = recursiveParserParsers
+    RecursiveParserItem recursiveParserStartRule _ _ :| _ = recursiveParserParsers
     basename = parserOptionsBaseFileName
-    headerName = map toUpper basename
     indent = indentLang 4
     parsers :: [Text]
     parsers = map makeOneParser $ NE.toList recursiveParserParsers
@@ -69,7 +67,7 @@ class #{parserOptionsName}:
     makeBody (Body debug syms) act = [interp|
       #{printDebug debug}
       #{T.intercalate "\n" $ map (uncurry makeBodySym) $ zip [1::Word ..] syms}
-      #{T.strip $ fromMaybe "" act}
+      #{writeAction act}
       |]
 
     makeAlt :: Lookahead -> (Body, Maybe Text) -> Text
@@ -78,6 +76,9 @@ class #{parserOptionsName}:
             #{indent 1 $ makeBody b act}
         |]
 
+    writeAction :: Maybe Text -> Text
+    writeAction Nothing = ""
+    writeAction (Just a) = [interp|return #{T.strip a};|]
 
     tok :: Symbol -> Text
     tok TermEof = "eof"

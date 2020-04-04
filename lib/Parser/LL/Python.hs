@@ -87,18 +87,14 @@ class #{className}:
     makeAction (body, mcode) n = [interp|
       if X == #{showIdx n}:
           #{indent 1 $ T.intercalate "\n" (reverse $ zipWith showArg body [1::Word ..])}
-          #{indent 1 act}
+          self.resultStack.append(#{act})
       |] :: Text
       where
         act :: Text
         act | Just code <- mcode
-            = [interp|
-                def doAction():
-                    #{indent 1 $ T.strip $ code}
-                self.resultStack.append(doAction())
-                |]
+            = [interp|(#{code})|]
             | otherwise
-            = [interp|self.resultStack.append(None)|]
+            = "None"
         showArg _ i = [interp|_#{tshow i}=self.resultStack.pop()|]
 
 encodeSymbol :: Symbol -> Text

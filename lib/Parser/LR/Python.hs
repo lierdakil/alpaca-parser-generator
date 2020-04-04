@@ -114,21 +114,13 @@ class #{name}:
       if self.debug:
           print(f'{self.top()} is now on top of the stack;')
           print(f'{gt} will be placed on the stack')
-      #{actionDef}
-      self.stack.append((gt,#{result}))
+      self.stack.append((gt,(#{result})))
       |]
       where
-        actionDef :: Text
-        actionDef | Just code <- mcode
-          = [interp|
-            def runAction():
-                #{indent 1 $ T.strip code}
-            |]
-                  | otherwise = ""
         result :: Text
         result
-          | Just _ <- mcode
-          = "runAction()"
+          | Just code <- mcode
+          = T.strip code
           | otherwise
           = "None"
         showArg _ i = [interp|_#{i} = self.stack.pop()[1]|]

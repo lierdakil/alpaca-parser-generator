@@ -13,6 +13,7 @@ import Parser.LR.Build
 import Parser.LR.LALR
 import Parser.LR.SLR
 import Parser.LR.CPP()
+import Parser.LR.CSharp()
 import Parser.LR.Python()
 import Data.Proxy
 import Lang

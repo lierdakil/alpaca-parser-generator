@@ -124,19 +124,15 @@ ResultType #{className}::parse() {
     makeAction (body, mcode) n = [interp|
       case #{showIdx n}: {
         #{indent 1 $ T.intercalate "\n" (reverse $ zipWith showArg body [1::Word ..])}
-        #{indent 1 act}
+        resultStack.push(#{act});
         break;
       }|] :: Text
       where
         act :: Text
         act | Just code <- mcode
-            = [interp|resultStack.push(([](#{argDefs}) { #{code} })(#{args}));|]
+            = [interp|(#{code})|]
             | otherwise
-            = [interp|resultStack.push(ResultType());|]
-        argDefs = T.intercalate "," $ zipWith showArgDef body [1::Word ..]
-        args = T.intercalate "," $ zipWith showCallArg body [1::Word ..]
-        showArgDef _ i = [interp|auto &&_$#{i}|]
-        showCallArg _ i = [interp|std::move(_#{i})|]
+            = "ResultType()"
         showArg (NonTerm _) i = [interp|
           auto _#{tshow i}=std::move(std::get<0>(resultStack.top()));
           resultStack.pop();

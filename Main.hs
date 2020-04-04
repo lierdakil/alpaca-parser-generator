@@ -40,12 +40,19 @@ runProgram (LangParserProxy lang parserMethod) parserName baseFileName inputFile
 langReader = eitherReader go
   where go "cpp" = Right $ \(ParserProxy p) -> LangParserProxy cpp p
         go "c++" = Right $ \(ParserProxy p) -> LangParserProxy cpp p
+        go "c#" = Right $ \(ParserProxy p) -> LangParserProxy csharp p
+        go "csharp" = Right $ \(ParserProxy p) -> LangParserProxy csharp p
+        go "cs" = Right $ \(ParserProxy p) -> LangParserProxy csharp p
         go "python" = Right $ \(ParserProxy p) -> LangParserProxy python p
         go "py" = Right $ \(ParserProxy p) -> LangParserProxy python p
         go _ = Left "Invalid value, allowed values: cpp, c++, python, py"
 
-data ParserProxy = forall p. (Parser p, ParserWriter p CPP, ParserWriter p Python)
-                => ParserProxy { unPP :: Proxy p }
+data ParserProxy = forall p.
+  ( Parser p
+  , ParserWriter p CPP
+  , ParserWriter p CSharp
+  , ParserWriter p Python
+  ) => ParserProxy { unPP :: Proxy p }
 data LangParserProxy = forall l p. (Parser p, ParserWriter p l, LexerWriter l)
                     => LangParserProxy (Proxy l) (Proxy p)
 
@@ -96,7 +103,7 @@ main = join $ execParser opts
   where
   opts = info (parser <**> helper)
     ( fullDesc
-   <> progDesc "Anæmic Lexer and PArser Creation Algorithm"
+   <> progDesc "Anemic Lexer and PArser Creation Algorithm"
    <> header "ALPACA" )
 
 wrap n m =

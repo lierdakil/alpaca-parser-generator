@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
-{-# LANGUAGE QuasiQuotes, OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes, OverloadedStrings, FlexibleContexts #-}
 module Lexer.CPP where
 
 import qualified Data.IntSet as IS
@@ -39,7 +39,7 @@ class Lexer {
   std::string::const_iterator endIx;
   const bool debug;
 public:
-  Lexer(const std::string &input, bool debug);
+  Lexer(const std::string &input, bool debug = false);
   Token getNextToken();
 };
 #endif
@@ -57,7 +57,7 @@ Token mkToken(TokenType type, const std::string_view &text) {
   return Token{type, std::string(text)};
 }\n
 #endif\n
-Lexer::Lexer(const std::string &input, bool debug=false)
+Lexer::Lexer(const std::string &input, bool debug)
 : _input(input), input(_input), curChIx(input.cbegin()), endIx(input.cend()), debug(debug) {}
 Token Lexer::getNextToken() {
   start:
@@ -65,13 +65,13 @@ Token Lexer::getNextToken() {
   auto startChIx = curChIx;
   char curCh;
   int accSt = -1;
-  #{transTable}
+  #{indent 1 transTable}
   end:
   auto lastReadChIx = curChIx;
   curChIx = lastAccChIx;
   std::string_view text(&*startChIx, std::distance(startChIx, curChIx));
   switch(accSt){
-    #{returnResult}
+    #{indent 2 returnResult}
   }
   if (curChIx == endIx) {
   if (debug) std::cerr << "Got EOF while lexing \"" << text << "\"" << std::endl;
@@ -80,28 +80,36 @@ Token Lexer::getNextToken() {
 }
 |])]
     where
+    indent = indentLang 2
     accStS = IS.fromList $ map fst accSt
     checkAccepting st
-      | st `IS.member` accStS
-      = "lastAccChIx = curChIx; accSt = "<>tshow st <>";"
+      | st `IS.member` accStS = [interp|
+        lastAccChIx = curChIx;
+        accSt = #{st};
+        |]
       | otherwise = ""
-    returnResult = T.concat (foldr ((:) . returnResult1) [] accSt)
+    returnResult = T.intercalate "\n" (map returnResult1 accSt)
     tokReflect = T.intercalate "," . map (\x -> "\"" <> x <> "\"") $ "%eof":tokNames
-    checkState (curSt, (_, charTrans)) = "state_" <> tshow curSt <> ":"
-      <> checkAccepting curSt
-      <> "if(curChIx == endIx) goto end;"
-      <> "curCh = *curChIx; ++curChIx;"
-      <> T.intercalate " else " (foldr ((:) . checkChars) [] charTrans)
-      <> "goto end;"
-    transTable = foldMap checkState stList
-    returnResult1 (st, (Just name, act))
-      = "case "<> tshow st <>":\
-        \if (debug) std::cerr << \"Lexed token " <> name <> ": \\\"\" << text << \"\\\"\" << std::endl; \
-        \return mkToken(TokenType::Tok_" <> name <> mkAct act <>");"
-    returnResult1 (st, (Nothing, _))
-      = "case "<> tshow st <>":\
-        \if (debug) std::cerr << \"Skipping state " <> tshow st <> ": \\\"\" << text << \"\\\"\" << std::endl; \
-        \goto start;"
+    checkState (curSt, (_, charTrans)) = [interp|
+      state_#{curSt}:
+        #{indent 1 $ checkAccepting curSt}
+        if(curChIx == endIx) goto end;
+        curCh = *curChIx;
+        ++curChIx;
+        #{T.intercalate " else " (map checkChars charTrans)}
+        goto end;
+      |]
+    transTable = T.intercalate "\n" $ map checkState stList
+    returnResult1 (st, (Just name, act)) = [interp|
+      case #{st}:
+        if (debug) std::cerr << "Lexed token #{name}: \\"" << text << "\\"" << std::endl;
+        return mkToken(TokenType::Tok_#{name}#{mkAct act});
+      |]
+    returnResult1 (st, (Nothing, _)) = [interp|
+      case #{st}:
+        if (debug) std::cerr << "Skipping state #{st}: \\"" << text << "\\"" << std::endl;
+        goto start;
+      |]
     mkAct NoAction = ""
     mkAct (Action act) = "," <> act
     checkChars (charGroup, newSt) = "if(" <> charCond charGroup <> ") goto state_" <> tshow newSt <> ";"

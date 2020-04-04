@@ -141,13 +141,9 @@ ResultType #{name}::parse() {
         result :: Text
         result
           | Just code <- mcode
-          = [interp|([](#{argDefs}) { #{code} })(#{args})|]
+          = [interp|(#{T.strip code})|]
           | otherwise
           = "ResultType()"
-        argDefs = T.intercalate "," $ zipWith showArgDef body [1::Word ..]
-        args = T.intercalate "," $ zipWith showCallArg body [1::Word ..]
-        showArgDef _ i = [interp|auto &&_#{i}|]
-        showCallArg _ i = [interp|std::move(_#{i})|]
         showArg (NonTerm _) i = "auto _"<>tshow i<>"=std::move(std::get<0>(stack.top().second)); stack.pop();"
         showArg _ i = "auto _"<>tshow i<>"=std::move(std::get<1>(stack.top().second)); stack.pop();"
     nonTermIdx nt = fromJust $ M.lookup nt nonTerminalsMap

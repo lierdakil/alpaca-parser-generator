@@ -3,7 +3,7 @@
   , RecordWildCards
   , MultiParamTypeClasses
   #-}
-module Parser.Recursive.CPP where
+module Parser.Recursive.CSharp where
 
 import Grammar
 
@@ -14,59 +14,47 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Utils
 import Parser.Types
-import Data.Char
 import qualified Control.Arrow as A
 import Parser.Recursive.Build
 import Lang
 
-instance ParserWriter RecursiveParser CPP where
+instance ParserWriter RecursiveParser CSharp where
   --writeParser :: forall a. Proxy lang -> ParserOptions a -> parser -> [(FilePath,Text)]
   writeParser _ gtop ParserOptions{..} RecursiveParser{..} =
-    [(basename <> ".h", [interp|
-#ifndef #{headerName}_H
-#define #{headerName}_H
-#include "lexer.h"
+    [(basename <> ".cs", [interp|
+using lexer;
+using System;
 #{gtop}
+namespace parser {
 class #{parserOptionsName} {
-  Lexer *lex;
-  Token curTok;
-  bool debug;
-  #{indent 1 $ T.intercalate "\n" $ map fst parsers}
-public:
-  #{parserOptionsName}(Lexer *lex, bool debug = false);
-  #{returnType startRuleDoesReturn} parse();
-};
-#endif
-|]) ,(basename <> ".cpp", [interp|
-#include "#{basename}.h"
-#include <stdexcept>
-#include <iostream>
-#{parserOptionsName}::#{parserOptionsName}(Lexer *lex, bool debug):lex(lex),debug(debug){
-  curTok = lex->getNextToken();
+  private readonly Lexer lex;
+  private (TokenType type, dynamic attr) curTok;
+  private readonly bool debug;
+  #{indent 1 $ T.intercalate "\n" parsers}
+  public #{parserOptionsName}(Lexer lex, bool debug = false) {
+    this.lex = lex;
+    this.debug = debug;
+    curTok = lex.getNextToken();
+  }
+  public dynamic parse() {
+    return parse_#{recursiveParserStartRule}();
+  }
 }
-#{returnType startRuleDoesReturn} Parser::parse() { return parse_#{recursiveParserStartRule}(); }
-#{T.intercalate "\n" $ map snd parsers}
+}
 |])]
     where
-    RecursiveParserItem recursiveParserStartRule startRuleDoesReturn _ :| _ = recursiveParserParsers
+    RecursiveParserItem recursiveParserStartRule _ _ :| _ = recursiveParserParsers
     basename = parserOptionsBaseFileName
-    headerName = map toUpper basename
     indent = indentLang 2
-    parsers :: [(Text, Text)]
+    parsers :: [Text]
     parsers = map makeOneParser $ NE.toList recursiveParserParsers
 
-    makeOneParser :: RecursiveParserItem -> (Text, Text)
-    makeOneParser RecursiveParserItem{..} = ([interp|
-      #{returnType recursiveParserItemDoesReturn} parse_#{recursiveParserItemHead}();
-      |], [interp|
-      #{returnType recursiveParserItemDoesReturn} #{parserOptionsName}::parse_#{recursiveParserItemHead}() {
+    makeOneParser :: RecursiveParserItem -> Text
+    makeOneParser RecursiveParserItem{..} = [interp|
+      private dynamic parse_#{recursiveParserItemHead}() {
         #{indent 1 $ makeAlternatives recursiveParserItemHead recursiveParserItemAlternatives }
       }
-      |])
-
-    returnType :: RecursiveParserItemDoesReturn -> Text
-    returnType DoesReturnValue = "ResultType"
-    returnType DoesNotReturnValue = "void"
+      |]
 
     makeAlternatives :: Text -> RecursiveParserItemAlternatives -> Text
     makeAlternatives _ (SingleBody b act) = makeBody b act
@@ -77,12 +65,12 @@ public:
       |] where alts' = map (A.first fromJust) $ filter (isJust . fst) alts
                alt | Just x <- lookup Nothing alts = uncurry makeBody x
                    | otherwise = [interp|
-                        throw std::runtime_error("No alternative matched while parsing nonterminal #{h}:" + to_string(curTok.type));
+                        throw new ApplicationException($"No alternative matched while parsing nonterminal #{h}: {curTok.type}");
                       |]
 
     makeBody :: Body -> Maybe Text -> Text
     makeBody (Body debug syms) act = [interp|
-      if (debug) std::cerr << "#{debug}" << std::endl;
+      if (debug) Console.Error.WriteLine("#{debug}");
       #{T.intercalate "\n" $ map (uncurry makeBodySym) $ zip [1::Word ..] syms}
       #{writeAction act}
       |]
@@ -93,7 +81,7 @@ public:
 
     makeAlt :: Lookahead -> (Body, Maybe Text) -> Text
     makeAlt s (b, act) = [interp|
-      if(curTok.type == TokenType::#{tok s}){
+      if(curTok.type == TokenType.#{tok s}){
         #{indent 1 $ makeBody b act}
       }
       |]
@@ -106,12 +94,12 @@ public:
     makeBodySym :: Word -> (Symbol, RecursiveParserItemDoesReturn) -> Text
     makeBodySym n s = case s of
       (NonTerm nt, DoesReturnValue)
-        -> [interp|auto _#{n} = parse_#{nt}();|]
+        -> [interp|dynamic _#{n} = parse_#{nt}();|]
       (NonTerm nt, DoesNotReturnValue)
         -> [interp|parse_#{nt}();|]
       (s', _) -> [interp|
-        if(curTok.type != TokenType::#{tok s'})
-          throw std::runtime_error("Expected token #{tok s'}, but got " + to_string(curTok.type));
-        auto _#{n} = std::move(curTok);
-        curTok = lex->getNextToken();
+        if(curTok.type != TokenType.#{tok s'})
+          throw new ApplicationException($"Expected token #{tok s'}, but got {curTok.type}");
+        var _#{n} = curTok;
+        curTok = lex.getNextToken();
         |]
