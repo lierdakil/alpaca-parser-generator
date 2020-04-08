@@ -81,14 +81,14 @@ buildTable :: RulesMap -> Table
 buildTable r = M.fromListWith (<>) $ foldMap (uncurry oneRule) rules
   where
   rules = M.toList r
-  oneRule h = map (uncurry (oneAlt h)) . NE.toList
-  oneAlt h alpha act = ((NonTerm h, alpha), (followSet `S.union` firstAlphaNoEps, act))
+  oneRule h = map (oneAlt h) . NE.toList
+  oneAlt h BodyWithAction{..} = ((NonTerm h, bwaBody), (followSet `S.union` firstAlphaNoEps, bwaAction))
     where
     followSet
       | Nothing `S.member` firstAlpha
       = follow r (NonTerm h)
       | otherwise = S.empty
-    firstAlpha = first r alpha
+    firstAlpha = first r bwaBody
     firstAlphaNoEps = S.map fromJust (S.delete Nothing firstAlpha)
 
 indexTable :: LLParser -> ([[Maybe Word]], M.Map ([Symbol], Maybe Text) Word)
@@ -97,7 +97,7 @@ indexTable LLParser{..}
     $ mapM (\nt -> mapM (makeCell nt) llTerminals) llNonTerminals
   where
   makeCell nt t
-    | Just x@(b, ma) <- M.lookup (t, nt) llActions
+    | Just x <- M.lookup (t, nt) llActions
     = do
         am <- get
         let (ai, am')

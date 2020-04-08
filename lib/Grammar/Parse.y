@@ -21,8 +21,9 @@ import qualified Data.Text as T
   act  { TAction $$ }
   eof  { TEOF }
   top  { TTop $$ }
-
-%left '|'
+  left { TLeft $$ }
+  rght { TRight $$ }
+  nona { TNonAssoc $$ }
 
 %%
 
@@ -45,7 +46,13 @@ Alternatives
   | BodyWithAction                  { ($1 :|) }
 
 BodyWithAction
-  : Body Action           { (reverse $1, $2) }
+  : Assoc Body Action           { BodyWithAction $1 (reverse $2) $3 }
+
+Assoc
+  : left          { Just (AssocLeft $1) }
+  | rght          { Just (AssocRight $1) }
+  | nona          { Just (AssocNone $1) }
+  |               { Nothing }
 
 Action
   : act  { Just $1 }
@@ -63,7 +70,15 @@ Symbol
 {
 data Grammar = Grammar Text (NonEmpty Rule)
 data Symbol = TermEof | Term Text | NonTerm Text deriving (Eq, Ord, Show)
-data Rule = Rule Text (NonEmpty ([Symbol], Maybe Text)) deriving (Eq, Show)
+data Rule = Rule Text (NonEmpty BodyWithAction) deriving (Eq, Show)
+data BodyWithAction = BodyWithAction {
+    bwaAssoc :: Maybe Assoc
+  , bwaBody :: Body
+  , bwaAction :: Maybe Text
+  } deriving (Eq, Show)
+type Body = [Symbol]
+data Assoc = AssocLeft Word | AssocRight Word | AssocNone Word
+  deriving (Eq, Show)
 
 parseError :: [Token] -> a
 parseError x = error $ "Parse error at" <> show x

@@ -12,6 +12,8 @@ import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Set as S
+import Data.List
 import Utils
 import Parser.Types
 import qualified Control.Arrow as A
@@ -62,8 +64,8 @@ class #{parserOptionsName} {
       #{T.intercalate " else " $ map (uncurry makeAlt) alts'} else {
         #{indent 1 alt}
       }
-      |] where alts' = map (A.first fromJust) $ filter (isJust . fst) alts
-               alt | Just x <- lookup Nothing alts = uncurry makeBody x
+      |] where alts' = map (A.first $ S.map fromJust) $ filter (all isJust . fst) alts
+               alt | Just res <- find (S.member Nothing . fst) alts = uncurry makeBody (snd res)
                    | otherwise = [interp|
                         throw new ApplicationException($"No alternative matched while parsing nonterminal #{h}: {curTok.type}");
                       |]
@@ -79,12 +81,18 @@ class #{parserOptionsName} {
     writeAction Nothing = ""
     writeAction (Just a) = [interp|return #{T.strip a};|]
 
-    makeAlt :: Lookahead -> (Body, Maybe Text) -> Text
+    makeAlt :: S.Set Symbol -> (Body, Maybe Text) -> Text
     makeAlt s (b, act) = [interp|
-      if(curTok.type == TokenType.#{tok s}){
+      if(#{checkLookahead s}){
         #{indent 1 $ makeBody b act}
       }
       |]
+
+    checkLookahead :: S.Set Symbol -> Text
+    checkLookahead la = T.intercalate " || " $ map cond $ S.toList la
+      where
+        cond :: Symbol -> Text
+        cond s = [interp|curTok.type == TokenType.#{tok s}|]
 
     tok :: Symbol -> Text
     tok TermEof = "eof"

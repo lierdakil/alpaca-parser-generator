@@ -12,6 +12,8 @@ import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Set as S
+import Data.List
 import Utils
 import Parser.Types
 import qualified Control.Arrow as A
@@ -57,8 +59,8 @@ class #{parserOptionsName}:
       #{T.intercalate "\nel" $ map (uncurry makeAlt) alts'}
       else:
           #{indent 1 alt}
-      |] where alts' = map (A.first fromJust) $ filter (isJust . fst) alts
-               alt | Just res <- lookup Nothing alts = uncurry makeBody res
+      |] where alts' = map (A.first $ S.map fromJust) $ filter (all isJust . fst) alts
+               alt | Just res <- find (S.member Nothing . fst) alts = uncurry makeBody (snd res)
                    | otherwise = [interp|
                       raise Exception("No alternative matched while parsing nonterminal #{h}:" + str(self.curTok[0]));
                       |]
@@ -70,11 +72,17 @@ class #{parserOptionsName}:
       #{writeAction act}
       |]
 
-    makeAlt :: Lookahead -> (Body, Maybe Text) -> Text
+    makeAlt :: S.Set Symbol -> (Body, Maybe Text) -> Text
     makeAlt s (b, act) = [interp|
-        if self.curTok[0] == TokenType.#{tok s}:
+        if #{checkLookahead s}:
             #{indent 1 $ makeBody b act}
         |]
+
+    checkLookahead :: S.Set Symbol -> Text
+    checkLookahead la = T.intercalate " or " $ map cond $ S.toList la
+      where
+        cond :: Symbol -> Text
+        cond s = [interp|self.curTok[0] == TokenType.#{tok s}|]
 
     writeAction :: Maybe Text -> Text
     writeAction Nothing = ""

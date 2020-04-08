@@ -6,6 +6,7 @@ module Grammar (
   , RulesMap
   , Rules
   , Grammar(..)
+  , BodyWithAction(..)
   , parse
   , showBody
   , showSymbol
@@ -28,7 +29,7 @@ import MonadTypes
 import Data.Text (Text)
 import qualified Data.Text as T
 
-type Alt = ([Symbol], Maybe Text)
+type Alt = BodyWithAction
 type RulesMap = M.Map Text (NonEmpty Alt)
 type Rules = NonEmpty Rule
 
@@ -66,7 +67,7 @@ first r = first' S.empty
     | otherwise = firstT
     where
     first'' = first' $ S.insert t seen
-    firstT = S.unions (map (first'' . fst) $ maybe [] NE.toList $ M.lookup t r)
+    firstT = S.unions (map (first'' . bwaBody) $ maybe [] NE.toList $ M.lookup t r)
   first' _ (TermEof:_) = S.singleton $ Just TermEof
   first' _ (Term t:_) = S.singleton $ Just (Term t)
   first' _ [] = S.singleton Nothing
@@ -74,7 +75,7 @@ first r = first' S.empty
 isLeftRecursive :: MonadWriter [Text] f => RulesMap -> f Bool
 isLeftRecursive r = or <$> mapM isRuleLeftRec (M.toList r)
   where
-  isRuleLeftRec (h, alts) = or <$> mapM (isBodyLeftRec h . fst) (NE.toList alts)
+  isRuleLeftRec (h, alts) = or <$> mapM (isBodyLeftRec h . bwaBody) (NE.toList alts)
 
   isBodyLeftRec h xs
     | isLeftRec h xs = do
@@ -92,7 +93,7 @@ isLeftRecursive r = or <$> mapM isRuleLeftRec (M.toList r)
       | otherwise = firstT
       where
       first'' = first' $ S.insert t seen
-      firstT = any (first'' . fst) $ maybe [] NE.toList $ M.lookup t r
+      firstT = any (first'' . bwaBody) $ maybe [] NE.toList $ M.lookup t r
     first' _ (TermEof:_) = False
     first' _ (Term _:_) = False
     first' _ [] = False
@@ -109,7 +110,7 @@ follow r t@(NonTerm _) = evalState (follow' t) S.empty
       S.unions <$> mapM (uncurry oneRule) rules
     else return S.empty
     where
-    oneRule h = fmap S.unions . mapM (oneAlt h . fst)
+    oneRule h = fmap S.unions . mapM (oneAlt h . bwaBody)
     oneAlt h b
       | _:beta <- dropWhile (/=x) b = go beta
       | otherwise = return S.empty

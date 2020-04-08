@@ -109,7 +109,7 @@ instance LRPoint p => Parser (LRParser p) where
     isNonTerm (NonTerm x) = Just $ NonTerm x
     isNonTerm _ = Nothing
     Rule start _ :| _ = rules
-    r = mkRulesMap (Rule ExtendedStartRule (([NonTerm start, TermEof], Nothing) :| []) <| rules)
+    r = mkRulesMap (Rule ExtendedStartRule (BodyWithAction Nothing [NonTerm start, TermEof] Nothing :| []) <| rules)
 
 buildLRAutomaton :: forall p. LRPoint p => Text -> RulesMap -> LRAutomaton p
 buildLRAutomaton oldStartRule r = (,) startState . fst . flip execState (M.empty, S.empty) $ buildGotoTable startState
@@ -162,7 +162,7 @@ pointClosure r = unify . flip evalState S.empty . fmap S.unions . mapM doAdd . S
     then do
       modify (S.insert p)
       let Just alts = M.lookup nt r
-          new = map (\(b, act) -> makeFirstPoint r p nt b beta act) $ NE.toList alts
+          new = map (\BodyWithAction{..} -> makeFirstPoint r p nt bwaBody beta bwaAction) $ NE.toList alts
       S.union (S.fromList (p : new)) . S.unions <$> mapM doAdd new
     else return S.empty
   doAdd x = return (S.singleton x)
