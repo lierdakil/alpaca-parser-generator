@@ -7,12 +7,11 @@ import Lexer
 import Parser.Recursive
 import Parser.LL
 import Parser.LR
--- import ParseSLR
--- import ParseLALR
+import MonadTypes
+
 import System.Environment
 import System.FilePath
 import System.Directory
-import MonadTypes
 import Data.Proxy
 import Control.Monad
 import Data.Text (Text)
@@ -20,7 +19,6 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import Options.Applicative hiding (Parser)
 import qualified Options.Applicative as OA
-import Lexer.Types()
 
 runProgram (LangParserProxy lang parserMethod) parserName baseFileName inputFile = do
   input <- T.readFile inputFile

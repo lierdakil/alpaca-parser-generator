@@ -23,12 +23,12 @@ library
                      , Parser.Recursive
                      , Parser.LL
                      , Parser.LR
-                     , Parser.Types
-                     , Lexer.Types
                      , MonadTypes
                      , Lang
   other-modules:       Regex.Lex
                      , Regex.Parse
+                     , Lexer.Types
+                     , Parser.Types
                      , Grammar.Lex
                      , Grammar.Parse
                      , Grammar
