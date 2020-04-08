@@ -28,6 +28,7 @@ import qualified Data.List.NonEmpty as NE
 import Control.Monad.State
 import Control.Monad.Writer.Class
 import MonadTypes
+import Utils
 import Data.Text (Text)
 import qualified Data.Text as T
 
@@ -36,7 +37,19 @@ type RulesMap = M.Map Text (NonEmpty Alt)
 type Rules = NonEmpty Rule
 
 parse :: Monad m => Text -> MyMonadT m Grammar
-parse = fmap grammar . scan
+parse t = do
+  gr <- grammar <$> scan t
+  tokens <- gets S.fromList
+  let gtoks = collectTerminals gr
+  unless (gtoks `S.isSubsetOf` tokens) $
+    throwError ["Undefined terminals in grammar: " <> tshow (S.toList (gtoks S.\\ tokens))]
+  return gr
+
+collectTerminals :: Grammar -> S.Set Symbol
+collectTerminals (Grammar _ rs) = foldMap ts rs
+  where ts (Rule _ b) = foldMap (foldMap us . bwaBody) b
+        us (NonTerm _) = S.empty
+        us x = S.singleton x
 
 scan :: Monad m => Text -> MyMonadT m [Token]
 scan s = either (throwError . pure . T.pack) return $ runAlex (T.unpack s) go
