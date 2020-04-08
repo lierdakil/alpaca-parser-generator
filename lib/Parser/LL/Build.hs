@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleContexts, OverloadedStrings, QuasiQuotes, RecordWildCards #-}
-module Parser.LL.Build where
+module Parser.LL.Build (LLParser(..), indexTable) where
 
 import Grammar
 import Data.Maybe

@@ -3,7 +3,7 @@
   , RecordWildCards
   , MultiParamTypeClasses
   #-}
-module Parser.Recursive.CSharp where
+module Parser.Recursive.CSharp () where
 
 import Grammar
 

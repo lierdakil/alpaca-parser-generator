@@ -4,7 +4,7 @@
   , MultiParamTypeClasses
   , FlexibleContexts
   #-}
-module Parser.LR.CSharp where
+module Parser.LR.CSharp () where
 
 import Parser.LR.Build
 import Lang

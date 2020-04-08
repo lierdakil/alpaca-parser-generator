@@ -1,5 +1,11 @@
 {-# LANGUAGE OverloadedStrings, ScopedTypeVariables, RecordWildCards #-}
-module Parser.Recursive.Build where
+module Parser.Recursive.Build (
+    RecursiveParser(..)
+  , RecursiveParserItem(..)
+  , RecursiveParserItemAlternatives(..)
+  , RecursiveParserItemDoesReturn(..)
+  , Body(..)
+  ) where
 
 import Grammar
 

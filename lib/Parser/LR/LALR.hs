@@ -2,7 +2,7 @@
            , FlexibleContexts
            , OverloadedStrings
            #-}
-module Parser.LR.LALR(LALRPoint) where
+module Parser.LR.LALR (LALRPoint) where
 
 import Grammar
 import Parser.LR.Point

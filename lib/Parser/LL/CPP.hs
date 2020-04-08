@@ -4,7 +4,7 @@
   , MultiParamTypeClasses
   , FlexibleContexts
   #-}
-module Parser.LL.CPP where
+module Parser.LL.CPP () where
 
 import Parser.Types
 import Lang

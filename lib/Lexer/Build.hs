@@ -1,5 +1,5 @@
 {-# LANGUAGE TupleSections, FlexibleContexts, OverloadedStrings #-}
-module Lexer.Build where
+module Lexer.Build (makeLexer) where
 
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -118,11 +118,3 @@ scanLine s = left T.pack $ runAlex (T.unpack s) go
     (tok :) <$> if tok /= TEOF
                 then go
                 else return []
-
-makeDFA :: Monad m => [Text] -> MyMonadT m ([(FilePath, Text)], DFA)
-makeDFA input = do
-  defs <- liftEither . left T.lines $ mapM (fmap regex . scanLine) input
-  let nfa = evalState (buildNFA defs) 0
-      dfa = simplifyDFA . nfaToDFA $ nfa
-      debug = [("nfa.gv", nfaToGraphviz nfa), ("dfa.gv", dfaToGraphviz dfa)]
-  return (debug, dfa)

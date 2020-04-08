@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeFamilies, OverloadedStrings #-}
-module Parser.LR.SLR where
+module Parser.LR.SLR (SLRPoint) where
 
 import Grammar
 import Parser.LR.Point

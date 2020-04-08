@@ -4,7 +4,7 @@
   , MultiParamTypeClasses
   , FlexibleContexts
   #-}
-module Parser.LL.Python where
+module Parser.LL.Python () where
 
 import Parser.Types
 import Lang

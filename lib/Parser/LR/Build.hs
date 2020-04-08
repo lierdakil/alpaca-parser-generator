@@ -8,7 +8,7 @@
            , TupleSections
            , RecordWildCards
            #-}
-module Parser.LR.Build where
+module Parser.LR.Build (LRParser(..), Action(..)) where
 
 import Grammar
 import qualified Data.Set as S

@@ -3,7 +3,7 @@
   , RecordWildCards
   , MultiParamTypeClasses
   #-}
-module Parser.Recursive.Python where
+module Parser.Recursive.Python () where
 
 import Grammar
 

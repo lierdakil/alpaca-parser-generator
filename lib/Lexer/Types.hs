@@ -1,4 +1,4 @@
-module Lexer.Types where
+module Lexer.Types (LexerWriter(..)) where
 
 import Data.Proxy
 import Data.Text (Text)

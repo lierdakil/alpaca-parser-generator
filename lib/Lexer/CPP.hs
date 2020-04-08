@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 {-# LANGUAGE QuasiQuotes, OverloadedStrings, FlexibleContexts #-}
-module Lexer.CPP where
+module Lexer.CPP() where
 
 import qualified Data.IntSet as IS
 import qualified Data.List.NonEmpty as NE
