@@ -19,6 +19,9 @@ import MonadTypes
 pattern ExtendedStartRule :: Text
 pattern ExtendedStartRule = "%S"
 
+extendedStartRuleBody :: Text -> [Symbol]
+extendedStartRuleBody start = [NonTerm start, TermEof]
+
 type LRState p = S.Set p
 type LRAutomaton p = (LRState p, M.Map (LRState p, Symbol) (LRState p))
 
@@ -29,9 +32,11 @@ class (Ord a, Ord (Lookahead a)) => LRPoint a where
   pointLookahead :: a -> S.Set (Lookahead a)
   modLookahead :: a -> S.Set (Lookahead a) -> a
   startPoint :: Text -> a
-  makeFirstPoint :: RulesMap -> a -> Text -> [Symbol] -> [Symbol] -> Maybe Text -> a
+  makeFirstPoint :: RulesMap -> a -> Text -> [Symbol] -> [Symbol] -> Maybe Text -> Maybe Assoc -> a
   lookaheadMatches :: a -> Symbol -> Bool
   showLookahead :: a -> Text
+  pointAssoc :: a -> Maybe Assoc
+  pointAssoc = lr0PointAssoc . lr0
   postprocess :: Monad m => LRAutomaton a -> MyMonadT m (LRAutomaton a)
   postprocess = return
 
@@ -40,6 +45,7 @@ data LR0Point = LR0Point {
   , lr0PointHead :: Text
   , lr0PointLeft :: [Symbol]
   , lr0PointRight :: [Symbol]
+  , lr0PointAssoc :: Maybe Assoc
   } deriving (Show, Eq, Ord)
 
 instance LRPoint LR0Point where
@@ -48,7 +54,7 @@ instance LRPoint LR0Point where
   modLr0 _ x = x
   pointLookahead = const S.empty
   modLookahead x _ = x
-  startPoint rule = LR0Point Nothing ExtendedStartRule [] [NonTerm rule]
+  startPoint rule = LR0Point Nothing ExtendedStartRule [] (extendedStartRuleBody rule) Nothing
   lookaheadMatches _ _ = True
   makeFirstPoint _ _ h b _ act = LR0Point act h [] b
   showLookahead = const ""
@@ -65,8 +71,8 @@ instance LRPoint LR1Point where
   pointLookahead = lr1PointLookahead
   modLookahead p v = p{lr1PointLookahead=v}
   startPoint rule = LR1Point (startPoint rule) (S.singleton TermEof)
-  makeFirstPoint r p@LR1Point{lr1PointLookahead=la} h b beta act
-    = LR1Point (makeFirstPoint r (lr0 p) h b beta act) $
+  makeFirstPoint r p@LR1Point{lr1PointLookahead=la} h b beta act assoc
+    = LR1Point (makeFirstPoint r (lr0 p) h b beta act assoc) $
       if Nothing `S.member` firstBeta
       then S.union la (S.map fromJust (S.delete Nothing firstBeta))
       else S.map fromJust firstBeta
@@ -93,7 +99,7 @@ pointLeft = reverse . lr0PointLeft . lr0
 pointRight :: LRPoint a => a -> [Symbol]
 pointRight = lr0PointRight . lr0
 
-pointAction :: LRPoint a => a -> Maybe ((Text, [Symbol]), Maybe Text)
+pointAction :: LRPoint a => a -> Maybe (((Text, [Symbol]), Maybe Text), Maybe Assoc)
 pointAction p
-  | null (pointRight p) = Just ((pointHead p, pointLeft p), lr0PointAction (lr0 p))
+  | null (pointRight p) = Just (((pointHead p, pointLeft p), lr0PointAction (lr0 p)), pointAssoc p)
   | otherwise = Nothing

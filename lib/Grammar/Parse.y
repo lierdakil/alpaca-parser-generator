@@ -49,9 +49,9 @@ BodyWithAction
   : Assoc Body Action           { BodyWithAction $1 (reverse $2) $3 }
 
 Assoc
-  : left          { Just (AssocLeft $1) }
-  | rght          { Just (AssocRight $1) }
-  | nona          { Just (AssocNone $1) }
+  : left          { Just (AssocLeft, $1) }
+  | rght          { Just (AssocRight, $1) }
+  | nona          { Just (AssocNone, $1) }
   |               { Nothing }
 
 Action
@@ -77,8 +77,9 @@ data BodyWithAction = BodyWithAction {
   , bwaAction :: Maybe Text
   } deriving (Eq, Show)
 type Body = [Symbol]
-data Assoc = AssocLeft Word | AssocRight Word | AssocNone Word
-  deriving (Eq, Show)
+type Assoc = (AssocType, Word)
+data AssocType = AssocNone | AssocLeft | AssocRight
+  deriving (Eq, Show, Ord)
 
 parseError :: [Token] -> a
 parseError x = error $ "Parse error at" <> show x

@@ -110,7 +110,10 @@ public class #{className} {
         + $"\\"{a.type}\\" in state {lastSt}. Expected \\"{expectedSyms[lastSt]}\\"");
       |] :: Text
     actionBody (Shift _) = error "does not happen"
-    actionBody (Reduce ((ExtendedStartRule, _), _)) = "return stack.Pop().value;"
+    actionBody (Reduce ((ExtendedStartRule, _), _)) = [interp|
+      stack.Pop();
+      return stack.Pop().value;
+      |]
     actionBody (Reduce ((h, body), mcode)) = [interp|
       if(debug) Console.Error.WriteLine("Reduce using #{h} -> #{showBody body}");
       #{T.intercalate "\n" (reverse $ zipWith showArg body [1::Word ..])}

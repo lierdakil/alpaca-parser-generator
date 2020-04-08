@@ -59,8 +59,8 @@ instance LRPoint LALRPoint where
     pointLookahead = pointLookahead . lr1Point
     modLookahead p v = LALRPoint $ (modLookahead . lr1Point) p v
     startPoint rule = LALRPoint $ startPoint rule
-    makeFirstPoint r p h b beta act
-      = LALRPoint $ makeFirstPoint r (lr1Point p) h b beta act
+    makeFirstPoint r p h b beta act assoc
+      = LALRPoint $ makeFirstPoint r (lr1Point p) h b beta act assoc
     lookaheadMatches = lookaheadMatches . lr1Point
     showLookahead = showLookahead . lr1Point
     postprocess = lalrify

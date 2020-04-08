@@ -26,6 +26,6 @@ instance LRPoint SLRPoint where
   modLookahead p v = p{slrLookahead=v}
   startPoint rule = SLRPoint (startPoint rule) $ S.singleton TermEof
   showLookahead p = T.intercalate "/" $ map showSymbol (S.toList $ slrLookahead p)
-  makeFirstPoint r SLRPoint{lr0Point=p} h b beta act
-    = SLRPoint (makeFirstPoint r p h b beta act) $ follow r (NonTerm h)
+  makeFirstPoint r SLRPoint{lr0Point=p} h b beta act assoc
+    = SLRPoint (makeFirstPoint r p h b beta act assoc) $ follow r (NonTerm h)
   lookaheadMatches p x = S.member x (slrLookahead p)

@@ -26,6 +26,7 @@ import qualified Data.Text as T
 import Utils
 import Parser.LR.Point
 import Parser.Types
+import Data.Function (on)
 
 data Action = Shift Word
     | Reduce ((Text, [Symbol]), Maybe Text)
@@ -51,18 +52,20 @@ instance LRPoint p => Parser (LRParser p) where
     let shiftActions st tok
           | Just st' <- M.lookup (st, tok) transitionTable
           , Just nst' <- M.lookup st' stateMap
-          = [Shift nst']
+          = [(Shift nst', pointAssoc $ S.findMin st')]
           | otherwise = []
         mkGotoTableCell st nt = return . ((stateIndex st, nt),) . fromMaybe 0 $
            M.lookup (st, nt) transitionTable >>= flip M.lookup stateMap
-        possibleActions st tok = shiftActions st tok <> reduceActions st tok
+        possibleActions st tok = tryResolveConflicts $ shiftActions st tok <> reduceActions st tok
         states = startState : S.toList (S.fromList $ M.elems transitionTable)
         nonTerminals = nub $ mapMaybe (isNonTerm . snd) $ M.keys transitionTable
         stateMap = M.fromList $ zip states [0::Word ..]
-        mkActionTableCell st tok = ((stateIndex st, tok),) <$> case possibleActions st tok of
-          [] -> return Reject
-          [x] -> return x
-          (x:xs) -> reportConflicts st tok (x:|xs) >> return x
+        mkActionTableCell st tok = ((stateIndex st, tok),) <$> do
+          pa <- possibleActions st tok
+          case pa of
+            [] -> return Reject
+            [x] -> return x
+            (x:xs) -> reportConflicts st tok (x:|xs) >> return x
         reportConflicts st tok (x:|xs) = do
           tell $
             [interp'|Conflicts detected in state #{stateIndex st} with token #{showSymbol tok}.|]
@@ -98,8 +101,9 @@ instance LRPoint p => Parser (LRParser p) where
       })
     where
     reduceActions st tok
-      | ps <- mapMaybe pointAction . filter (`lookaheadMatches` tok) $ S.toList (pointClosure r st)
-      = map Reduce ps
+      | ps <- mapMaybe pointAction . filter (`lookaheadMatches` tok)
+                $ S.toList (pointClosure r st)
+      = map (A.first Reduce) ps
     showAction (Shift n) = "Shift to state " <> tshow n
     showAction (Reduce ((h, b), _)) = [interp'|Reduce #{h} -> #{showBody b}|]
     showAction Reject = "Reject"
@@ -109,7 +113,7 @@ instance LRPoint p => Parser (LRParser p) where
     isNonTerm (NonTerm x) = Just $ NonTerm x
     isNonTerm _ = Nothing
     Rule start _ :| _ = rules
-    r = mkRulesMap (Rule ExtendedStartRule (BodyWithAction Nothing [NonTerm start, TermEof] Nothing :| []) <| rules)
+    r = mkRulesMap (Rule ExtendedStartRule (BodyWithAction Nothing (extendedStartRuleBody start) Nothing :| []) <| rules)
 
 buildLRAutomaton :: forall p. LRPoint p => Text -> RulesMap -> LRAutomaton p
 buildLRAutomaton oldStartRule r = (,) startState . fst . flip execState (M.empty, S.empty) $ buildGotoTable startState
@@ -162,7 +166,51 @@ pointClosure r = unify . flip evalState S.empty . fmap S.unions . mapM doAdd . S
     then do
       modify (S.insert p)
       let Just alts = M.lookup nt r
-          new = map (\BodyWithAction{..} -> makeFirstPoint r p nt bwaBody beta bwaAction) $ NE.toList alts
+          new = map (\BodyWithAction{..} -> makeFirstPoint r p nt bwaBody beta bwaAction bwaAssoc) $ NE.toList alts
       S.union (S.fromList (p : new)) . S.unions <$> mapM doAdd new
     else return S.empty
   doAdd x = return (S.singleton x)
+
+tryResolveConflicts :: Monad m => [(Action, Maybe Assoc)] -> MyMonadT m [Action]
+tryResolveConflicts [] = return []
+tryResolveConflicts [x] = return [fst x]
+tryResolveConflicts as = case undefined of
+    _ | null (concat [lefta, righta, nonea]) -> failResult -- no assoc info
+      | not (null noinfo) -> do
+        tell ["Not all rules in conflict have associativity information"]
+        failResult
+      | countEq > 1 -> do
+        tell ["Rules with the same priority but different associativity"]
+        failResult
+      | otherwise -> return result
+  where
+  result = uncurry resolve $ snd maxAssoc
+  failResult = return $ map fst as
+  (lefta, righta, nonea, noinfo) = foldr separate ([], [], [], []) as
+  separate (x, Nothing) (l, r, na, ni) = (l, r, na, x:ni)
+  separate (x, Just (AssocLeft, v)) (l, r, na, ni) = ((x,v):l, r, na, ni)
+  separate (x, Just (AssocRight, v)) (l, r, na, ni) = (l, (x,v):r, na, ni)
+  separate (x, Just (AssocNone, v)) (l, r, na, ni) = (l, r, (x,v):na, ni)
+  maxLeft = max' AssocLeft lefta
+  maxRight = max' AssocRight righta
+  maxNone = max' AssocNone nonea
+  max' t xs = let m = maximum' $ map snd xs
+    in (m, (t, map fst $ filter ((==m) . Just . snd) xs))
+  maximum' [] = Nothing
+  maximum' xs = Just $ maximum xs
+  assocs = [maxLeft, maxRight, maxNone]
+  maxAssoc = maximumBy (compare `on` fst) assocs
+  countEq :: Word
+  countEq = foldr (\x acc -> if fst maxAssoc == fst x then 1+acc else acc) 0 assocs
+  resolve _ [x] = [x]
+  resolve AssocLeft xs = case filter isReduce xs of
+    [] -> xs
+    rs -> rs
+  resolve AssocRight xs = case filter isShift xs of
+    [] -> xs
+    ss -> ss
+  resolve AssocNone xs = xs
+  isReduce Reduce{} = True
+  isReduce _ = False
+  isShift Shift{} = True
+  isShift _ = False

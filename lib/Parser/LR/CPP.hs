@@ -127,7 +127,10 @@ ResultType #{name}::parse() {
         + std::to_string(lastSt) + ". Expected \\"" + expectedSym(lastSt) +"\\"");
       |] :: Text
     actionBody (Shift _) = error "does not happen"
-    actionBody (Reduce ((ExtendedStartRule, _), _)) = "return std::move(std::get<0>(stack.top().second));"
+    actionBody (Reduce ((ExtendedStartRule, _), _)) = [interp|
+      stack.pop();
+      return std::move(std::get<0>(stack.top().second));
+      |]
     actionBody (Reduce ((h, body), mcode)) = [interp|
       if(debug) std::cerr << "Reduce using #{h} -> #{showBody body}\\n";
       #{T.intercalate "\n" (reverse $ zipWith showArg body [1::Word ..])}

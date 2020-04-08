@@ -7,6 +7,8 @@ module Grammar (
   , Rules
   , Grammar(..)
   , BodyWithAction(..)
+  , Assoc
+  , AssocType(..)
   , parse
   , showBody
   , showSymbol

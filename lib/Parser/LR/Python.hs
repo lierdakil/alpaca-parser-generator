@@ -105,7 +105,10 @@ class #{name}:
         f'Rejection state reached after parsing "{parsed}", when encoutered symbol "{a[0].name}" in state {lastSt}. Expected "{expectedSym(lastSt)}"')
       |] :: Text
     actionBody (Shift _) = error "does not happen"
-    actionBody (Reduce ((ExtendedStartRule, _), _)) = "return self.stack.pop()[1]"
+    actionBody (Reduce ((ExtendedStartRule, _), _)) = [interp|
+      self.stack.pop()
+      return self.stack.pop()[1]
+      |]
     actionBody (Reduce ((h, body), mcode)) = [interp|
       if self.debug: print("Reduce using #{h} -> #{showBody body}")
       #{T.intercalate "\n" (reverse $ zipWith showArg body [1::Word ..])}
