@@ -42,28 +42,20 @@ MbAct
   |     { NoAction }
 
 Exp
-  : ExpSeq         { reverse $1 }
-  | Exp '|' ExpSeq { buildAlt $1 (reverse $3) }
+  : ExpSeq         { $1 }
+  | Exp '|' ExpSeq { buildAlt $1 $3 }
 
 ExpSeq
-  : ExpSeq Single1  { $2 $1 }
+  : Single ExpSeq  { $1 $2 }
   |                { [] }
 
-Single1
-  : Single     { ($1:) }
-  | '(' Exp ')' { ($2<>) }
-
 Single
-  : '[' Grp ']' { PGroup $2 }
-  | Char        { PGroup (pure $1) }
-  | SubExp '*'  { PKleene $1 }
-  | SubExp '+'  { PPositive $1 }
-  | SubExp '?'  { PMaybe $1 }
-
-SubExp
-  : '[' Grp ']' { [PGroup $2] }
-  | Char        { [PGroup (pure $1)] }
-  | '(' Exp ')' { $2 }
+  : '[' Grp ']' { (PGroup $2:) }
+  | Char        { (PGroup (pure $1):) }
+  | Single '*'  { (PKleene ($1 []):) }
+  | Single '+'  { (PPositive ($1 []):) }
+  | Single '?'  { (PMaybe ($1 []):) }
+  | '(' Exp ')' { ($2 <>) }
 
 Char
   : '.' { CAny }

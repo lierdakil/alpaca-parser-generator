@@ -1,13 +1,11 @@
-{-# LANGUAGE TupleSections, FlexibleContexts, OverloadedStrings, QuasiQuotes #-}
+{-# LANGUAGE TupleSections, FlexibleContexts, OverloadedStrings #-}
 module Lexer.Build where
 
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Control.Monad.State
 import qualified Data.IntMap as IM
-import qualified Data.IntSet as IS
 import Data.List.NonEmpty (NonEmpty(..))
-import qualified Data.List.NonEmpty as NE
 import Data.List
 import Data.Maybe
 import Control.Arrow
@@ -57,24 +55,16 @@ regex1ToNFASt (PGroup ch) = do
   endSt <- newState
   return $ IM.singleton startSt (nonAcc $ M.singleton (Just ch) [endSt])
 regex1ToNFASt (PMaybe pat) = do
-  startSt <- get
-  patNfa <- regexToNFASt pat
-  endSt <- get
-  return $ IM.insertWith mapUnion startSt (nonAcc $ M.singleton Nothing [endSt]) patNfa
-regex1ToNFASt (PKleene pat) = do
-  startSt <- get
-  loopStartSt <- newState
-  patNfa <- regexToNFASt pat
-  loopEndSt <- get
-  endSt <- newState
-  return $ IM.insertWith mapUnion startSt (nonAcc $ M.singleton Nothing [endSt, loopStartSt])
-         $ IM.insertWith mapUnion loopEndSt (nonAcc $ M.singleton Nothing [loopStartSt, endSt])
-           patNfa
+  s2 <- get
+  nfa <- regexToNFASt pat
+  s3 <- get
+  return $ IM.insertWith mapUnion s2 (nonAcc $ M.singleton Nothing [s3]) nfa
+regex1ToNFASt (PKleene pat) = regex1ToNFASt (PMaybe [PPositive pat])
 regex1ToNFASt (PPositive pat) = do
-  startSt <- get
-  patNfa <- regexToNFASt pat
-  endSt <- get
-  return $ IM.insertWith mapUnion endSt (nonAcc $ M.singleton Nothing [startSt]) patNfa
+  s2 <- get
+  nfa <- regexToNFASt pat
+  s3 <- get
+  return $ IM.insertWith mapUnion s3 (nonAcc $ M.singleton Nothing [s2]) nfa
 regex1ToNFASt (PAlternative pats) = altNFA True $ map regexToNFASt pats
 
 altNFA :: Bool -> [State Int NFA] -> State Int NFA

@@ -84,22 +84,16 @@ nfaToDFASt nfa = do
 ecls :: Ord a =>
           IM.IntMap (StateAttr, M.Map (Maybe a) [IS.Key])
           -> [IS.Key] -> (StateAttr, IS.IntSet)
-ecls nfa st = (accs, IS.fromList stl)
+ecls nfa = ecls' (S.empty, IS.empty)
   where
-  accs = fst $ ecls' st
-  stl = snd $ ecls' st
-  -- ecls' :: [Int] -> (Bool, [Int])
-  ecls' arg = let res = map ecls1 arg
-                  acc = S.unions $ map fst res
-                  sts = foldMap snd res
-              in (acc, sts)
-  -- ecls1 :: Int -> (Bool, [Int])
-  ecls1 st2
-    | Just (acc, trans) <- IM.lookup st2 nfa
+  ecls' accum@(accAttr, accStates) (x:xs)
+    | x `IS.member` accStates = ecls' accum xs
+    | Just (attr, trans) <- IM.lookup x nfa
     = let newst = concat . maybeToList $ M.lookup Nothing trans
-          (restacc, rest) = ecls' newst
-      in (acc <> restacc, st2:newst <> rest)
-    | otherwise = (S.empty, [])
+      in  ecls' (attr <> accAttr, IS.insert x accStates) (xs <> newst)
+    | otherwise
+    = ecls' (accAttr, IS.insert x accStates) xs
+  ecls' accum [] = accum
 
 simplifyDFA :: DFA -> DFA
 simplifyDFA dfa = IM.fromList $ mapMaybe simpDFA lst

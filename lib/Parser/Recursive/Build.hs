@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, ScopedTypeVariables, QuasiQuotes, RecordWildCards #-}
+{-# LANGUAGE OverloadedStrings, ScopedTypeVariables, RecordWildCards #-}
 module Parser.Recursive.Build where
 
 import Grammar
@@ -11,7 +11,6 @@ import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 import Data.Text (Text)
 import Parser.Types
-import qualified Control.Arrow as A
 
 instance Parser RecursiveParser where
   --buildParser :: Monad m => Grammar -> MyMonadT m parser
