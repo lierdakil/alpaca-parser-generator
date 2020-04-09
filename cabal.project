@@ -1,0 +1,4 @@
+packages: .
+
+package parser-generator
+  ghc-options: -Wall -j +RTS -A64m -RTS

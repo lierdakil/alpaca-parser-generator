@@ -1,6 +1,4 @@
-{-# LANGUAGE FlexibleContexts, OverloadedStrings, ScopedTypeVariables, RankNTypes
-  , ExistentialQuantification, AllowAmbiguousTypes,
-  MultiParamTypeClasses, FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts, OverloadedStrings, ExistentialQuantification #-}
 module Main where
 
 import Lexer
@@ -9,7 +7,6 @@ import Parser.LL
 import Parser.LR
 import MonadTypes
 
-import System.Environment
 import System.FilePath
 import System.Directory
 import Data.Proxy
@@ -22,6 +19,7 @@ import qualified Data.Text.IO as T
 import Options.Applicative hiding (Parser)
 import qualified Options.Applicative as OA
 
+runProgram :: LangParserProxy -> Text -> String -> String -> IO ()
 runProgram (LangParserProxy lang parserMethod) parserName baseFileName inputFile = do
   input <- T.readFile inputFile
   let (lexicRaw, _:grammarLines) = break (=="%%") $ T.lines input
@@ -37,10 +35,12 @@ runProgram (LangParserProxy lang parserMethod) parserName baseFileName inputFile
       , parserOptionsGrammarDefinition = grammar
     }
 
+langReader :: ReadM (ParserProxy -> LangParserProxy)
 langReader = eitherReader go
   where go x | Just f <- find ((map toLower x `elem`) . fst) langTbl = Right $ snd f
         go _ = Left $ "Invalid value, allowed values: " <> intercalate ", " (concatMap fst langTbl)
 
+langTbl :: [([String], ParserProxy -> LangParserProxy)]
 langTbl = [
     (ncpp, \(ParserProxy p) -> LangParserProxy cpp p)
   , (ncs , \(ParserProxy p) -> LangParserProxy csharp p)
@@ -66,6 +66,7 @@ parserReader = eitherReader go
         go x | Just pp <- lookup (map toLower x) parsTbl = Right pp
         go _ = Left $ "Invalid value, allowed values: " <> intercalate ", " (map fst parsTbl)
 
+parsTbl :: [(String, ParserProxy)]
 parsTbl = [
     ("recursive", ParserProxy recursiveParser)
   , ("rec"      , ParserProxy recursiveParser)
@@ -116,8 +117,11 @@ main = join $ execParser opts
       \ inefficient, simple parsers in multiple target languages."
    <> header "ALPACA - Anemic Lexer and PArser Creation Algorithm" )
 
+wrap :: T.Text -> MyMonadT IO [(FilePath, Text)] -> MyMonadT IO ()
 wrap n m =
   censor (map (("Warning in "<>n<>": ")<>)) (writeFiles =<< m)
     `catchError`
     (tell . map (("Error in "<>n<>": ")<>))
+
+writeFiles :: [(FilePath, Text)] -> MyMonadT IO ()
 writeFiles = mapM_ (lift . lift . lift . uncurry T.writeFile)
