@@ -19,8 +19,11 @@ import qualified Data.Text.IO as T
 import Options.Applicative hiding (Parser)
 import qualified Options.Applicative as OA
 
-runProgram :: LangParserProxy -> Text -> String -> String -> IO ()
-runProgram (LangParserProxy lang parserMethod) parserName baseFileName inputFile = do
+type MainProgram = Text -> FilePath -> FilePath -> IO ()
+
+runProgram :: (LexerWriter lang, ParserWriter parser lang) =>
+              Proxy lang -> Proxy parser -> MainProgram
+runProgram lang parserMethod parserName baseFileName inputFile = do
   input <- T.readFile inputFile
   let (lexicRaw, _:grammarLines) = break (=="%%") $ T.lines input
       rootdir = takeDirectory inputFile
@@ -35,16 +38,18 @@ runProgram (LangParserProxy lang parserMethod) parserName baseFileName inputFile
       , parserOptionsGrammarDefinition = grammar
     }
 
-langReader :: ReadM (ParserProxy -> LangParserProxy)
-langReader = eitherReader go
-  where go x | Just f <- find ((map toLower x `elem`) . fst) langTbl = Right $ snd f
-        go _ = Left $ "Invalid value, allowed values: " <> intercalate ", " (concatMap fst langTbl)
+enumReader :: [([String], a)] -> ReadM a
+enumReader tbl = eitherReader go
+  where go x | Just f <- find ((map toLower x `elem`) . fst) tbl
+             = Right $ snd f
+        go _ = Left $ "Invalid value, allowed values: "
+             <> intercalate ", " (concatMap fst tbl)
 
-langTbl :: [([String], ParserProxy -> LangParserProxy)]
+langTbl :: [([String], ParserProxy -> MainProgram)]
 langTbl = [
-    (ncpp, \(ParserProxy p) -> LangParserProxy cpp p)
-  , (ncs , \(ParserProxy p) -> LangParserProxy csharp p)
-  , (npy , \(ParserProxy p) -> LangParserProxy python p)
+    (ncpp, \(ParserProxy p) -> runProgram cpp p)
+  , (ncs , \(ParserProxy p) -> runProgram csharp p)
+  , (npy , \(ParserProxy p) -> runProgram python p)
   ]
   where
   ncpp = ["cpp", "c++"]
@@ -57,39 +62,29 @@ data ParserProxy = forall p.
   , ParserWriter p CSharp
   , ParserWriter p Python
   ) => ParserProxy { unPP :: Proxy p }
-data LangParserProxy = forall l p. (Parser p, ParserWriter p l, LexerWriter l)
-                    => LangParserProxy (Proxy l) (Proxy p)
 
-parserReader :: ReadM ParserProxy
-parserReader = eitherReader go
-  where go :: String -> Either String ParserProxy
-        go x | Just pp <- lookup (map toLower x) parsTbl = Right pp
-        go _ = Left $ "Invalid value, allowed values: " <> intercalate ", " (map fst parsTbl)
-
-parsTbl :: [(String, ParserProxy)]
+parsTbl :: [([String], ParserProxy)]
 parsTbl = [
-    ("recursive", ParserProxy recursiveParser)
-  , ("rec"      , ParserProxy recursiveParser)
-  , ("ll1"      , ParserProxy llParser       )
-  , ("lr0"      , ParserProxy lr0Parser      )
-  , ("lr1"      , ParserProxy lr1Parser      )
-  , ("slr"      , ParserProxy slrParser      )
-  , ("lalr"     , ParserProxy lalrParser     )
+    (["recursive", "rec"], ParserProxy recursiveParser)
+  , (["ll1"]             , ParserProxy llParser       )
+  , (["lr0"]             , ParserProxy lr0Parser      )
+  , (["lr1"]             , ParserProxy lr1Parser      )
+  , (["slr"]             , ParserProxy slrParser      )
+  , (["lalr"]            , ParserProxy lalrParser     )
   ]
 
 parser :: OA.Parser (IO ())
-parser = runProgram
-  <$> (option langReader
+parser = (option (enumReader langTbl)
        ( short 'l'
       <> long "lang"
       <> help "Target language, default cpp"
       <> metavar (intercalate "|" (concatMap fst langTbl))
-      <> value (\(ParserProxy p) -> LangParserProxy cpp p))
-  <*> option parserReader
+      <> value (\(ParserProxy p) -> runProgram cpp p))
+  <*> option (enumReader parsTbl)
        ( short 'p'
       <> long "parser"
       <> help "Parser method, default lalr"
-      <> metavar (intercalate "|" (map fst parsTbl))
+      <> metavar (intercalate "|" (concatMap fst parsTbl))
       <> value (ParserProxy lalrParser)))
   <*> strOption
        ( short 'n'
