@@ -63,7 +63,7 @@ jobs:
       id: cache
       with:
         path: .cabal-store
-        key: ${{ runner.os }}-${{matrix.ghcver}}-${{matrix.pandocver}}-${{ hashFiles('parser-generator.cabal') }}
+        key: ${{ runner.os }}-${{matrix.ghcver}}-${{ hashFiles('parser-generator.cabal') }}
     - name: Cabal update
       run: cabal --store-dir=".cabal-store" v2-update
     - name: Install dependencies
@@ -88,9 +88,6 @@ jobs:
   release:
     needs: [windows, macos]
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        pandocver: ["2.9.2.1"]
     steps:
     - uses: actions/download-artifact@v1
       with:
@@ -134,7 +131,7 @@ jobs:
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./assets/parser-generator-macos-${{github.sha}}.tar.xz
-        asset_name: parser-generator-macOS-${{matrix.pandocver}}.tar.xz
+        asset_name: parser-generator-macOS.tar.xz
         asset_content_type: application/x-xz-compressed-tar
     - name: Upload Release Asset Windows
       if: contains(github.ref, 'tags/v')
@@ -144,5 +141,5 @@ jobs:
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./assets/parser-generator-windows-${{github.sha}}.7z
-        asset_name: parser-generator-Windows-${{matrix.pandocver}}.7z
+        asset_name: parser-generator-Windows.7z
         asset_content_type: application/x-7z-compressed
