@@ -95,6 +95,7 @@ jobs:
 
   release:
     needs: [windows, macos]
+    if: contains(github.ref, 'tags/v')
     runs-on: ubuntu-latest
     steps:
     - uses: actions/download-artifact@v1
@@ -106,20 +107,12 @@ jobs:
     - name: Unpack assets
       run: |
         unxz windows-build/parser-generator.exe.xz
-    - name: Get Version
-      id: get_version
-      run: |
-        chmod +x linux-build/parser-generator
-        VERSION="$(linux-build/parser-generator --version)"
-        echo ::set-output name=version::"$VERSION"
     - name: Repack assets
       run: |
         mkdir assets
-        tar cJf assets/parser-generator-linux-${{github.sha}}.tar.xz -C linux-build parser-generator parser-generator.1
         tar cJf assets/parser-generator-macos-${{github.sha}}.tar.xz -C macos-build parser-generator
         7z a assets/parser-generator-windows-${{github.sha}}.7z windows-build/parser-generator.exe
     - name: Create Release
-      if: contains(github.ref, 'tags/v')
       id: create_release
       uses: actions/create-release@v1
       env:
