@@ -26,6 +26,7 @@ jobs:
       if: steps.cache.outputs.cache-hit != 'true'
       run: |
         export PATH="/usr/local/opt/ghc@${{matrix.ghcver}}/bin:$PATH"
+        cabal --store-dir=".cabal-store" v2-install alex
         cabal --store-dir=".cabal-store" v2-build --only-dependencies --enable-tests
     - name: Build
       run: |
@@ -70,7 +71,9 @@ jobs:
       if: steps.cache.outputs.cache-hit != 'true'
       run: cabal --store-dir=".cabal-store" v2-build -w "$Env:ghc" --only-dependencies --enable-tests
     - name: Build
-      run: cabal --store-dir=".cabal-store" v2-build -w "$Env:ghc"
+      run: |
+        cabal --store-dir=".cabal-store" v2-install -w "$Env:ghc" alex
+        cabal --store-dir=".cabal-store" v2-build -w "$Env:ghc"
     - name: Copy binary
       shell: bash
       run: find dist-newstyle -type f -name parser-generator.exe -exec cp {} ./ \;
