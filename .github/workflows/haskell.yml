@@ -1,0 +1,148 @@
+name: Haskell CI
+
+on: [push]
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        ghcver: ["8.8"]
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup GHC
+      run: |
+        brew bundle --file=osx/Brewfile
+    - uses: actions/cache@v1
+      id: cache
+      with:
+        path: .cabal-store
+        key: ${{ runner.os }}-${{ hashFiles('parser-generator.cabal') }}
+    - name: Cabal update
+      run: |
+        export PATH="/usr/local/opt/ghc@${{matrix.ghcver}}/bin:$PATH"
+        cabal --store-dir=".cabal-store" v2-update
+    - name: Install dependencies
+      if: steps.cache.outputs.cache-hit != 'true'
+      run: |
+        export PATH="/usr/local/opt/ghc@${{matrix.ghcver}}/bin:$PATH"
+        cabal --store-dir=".cabal-store" v2-build --only-dependencies --enable-tests
+    - name: Build
+      run: |
+        export PATH="/usr/local/opt/ghc@${{matrix.ghcver}}/bin:$PATH"
+        cabal --store-dir=".cabal-store" v2-build
+    - name: Copy binary
+      shell: bash
+      run: find dist-newstyle -type f -perm +100 -name parser-generator -exec cp {} ./ \;
+    - name: Package artifact
+      shell: bash
+      run: |
+        upx --best parser-generator
+        mkdir parser-generator-macos
+        mv parser-generator parser-generator-macos
+    - uses: actions/upload-artifact@v1
+      with:
+        name: macos-build
+        path: parser-generator-macos
+
+  windows:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        cabalver: ["3.0"]
+        ghcver: ["8.6.5"]
+    env:
+      GHC: "C:\\ProgramData\\chocolatey\\lib\\ghc\\tools\\ghc-${{matrix.ghcver}}\\bin\\ghc.exe"
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup GHC
+      run: |
+        choco install ghc --version ${{matrix.ghcver}} --ignore-dependencies
+        choco install cabal --version ${{matrix.cabalver}} --ignore-dependencies
+    - uses: actions/cache@v1
+      id: cache
+      with:
+        path: .cabal-store
+        key: ${{ runner.os }}-${{matrix.ghcver}}-${{matrix.pandocver}}-${{ hashFiles('parser-generator.cabal') }}
+    - name: Cabal update
+      run: cabal --store-dir=".cabal-store" v2-update
+    - name: Install dependencies
+      if: steps.cache.outputs.cache-hit != 'true'
+      run: cabal --store-dir=".cabal-store" v2-build -w "$Env:ghc" --only-dependencies --enable-tests
+    - name: Build
+      run: cabal --store-dir=".cabal-store" v2-build -w "$Env:ghc"
+    - name: Copy binary
+      shell: bash
+      run: find dist-newstyle -type f -name parser-generator.exe -exec cp {} ./ \;
+    - name: Package artifact
+      shell: bash
+      run: |
+        7z a "parser-generator.exe.xz" parser-generator.exe
+        mkdir parser-generator-windows
+        mv parser-generator.exe.xz parser-generator-windows
+    - uses: actions/upload-artifact@v1
+      with:
+        name: windows-build
+        path: ./parser-generator-windows
+
+  release:
+    needs: [linux, windows, macos]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        pandocver: ["2.9.2.1"]
+    steps:
+    - uses: actions/download-artifact@v1
+      with:
+        name: macos-build
+    - uses: actions/download-artifact@v1
+      with:
+        name: windows-build
+    - name: Unpack assets
+      run: |
+        unxz windows-build/parser-generator.exe.xz
+    - name: Get Version
+      id: get_version
+      run: |
+        chmod +x linux-build/parser-generator
+        VERSION="$(linux-build/parser-generator --version)"
+        echo ::set-output name=version::"$VERSION"
+    - name: Repack assets
+      run: |
+        mkdir assets
+        tar cJf assets/parser-generator-linux-${{github.sha}}.tar.xz -C linux-build parser-generator parser-generator.1
+        tar cJf assets/parser-generator-macos-${{github.sha}}.tar.xz -C macos-build parser-generator
+        7z a assets/parser-generator-windows-${{github.sha}}.7z windows-build/parser-generator.exe
+    - name: Create Release
+      if: contains(github.ref, 'tags/v')
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: ${{ github.ref }}
+        draft: false
+        prerelease: false
+        body: |
+          ${{ steps.get_version.outputs.version }}
+    - name: Upload Release Asset macOS
+      if: contains(github.ref, 'tags/v')
+      uses: actions/upload-release-asset@v1.0.1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./assets/parser-generator-macos-${{github.sha}}.tar.xz
+        asset_name: parser-generator-macOS-${{matrix.pandocver}}.tar.xz
+        asset_content_type: application/x-xz-compressed-tar
+    - name: Upload Release Asset Windows
+      if: contains(github.ref, 'tags/v')
+      uses: actions/upload-release-asset@v1.0.1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./assets/parser-generator-windows-${{github.sha}}.7z
+        asset_name: parser-generator-Windows-${{matrix.pandocver}}.7z
+        asset_content_type: application/x-7z-compressed
