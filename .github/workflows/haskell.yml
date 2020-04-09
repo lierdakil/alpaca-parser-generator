@@ -25,12 +25,14 @@ jobs:
     - name: Install dependencies
       if: steps.cache.outputs.cache-hit != 'true'
       run: |
-        export PATH="/usr/local/opt/ghc@${{matrix.ghcver}}/bin:$PATH"
-        cabal --store-dir="$PWD/.cabal-store" v2-install alex
+        mkdir bin
+        export PATH="/usr/local/opt/ghc@${{matrix.ghcver}}/bin:$PWD/.cabal-store/bin:$PATH"
+        cabal --store-dir="$PWD/.cabal-store" v2-install --installdir="$PWD/.cabal-store/bin" alex
+        cabal --store-dir="$PWD/.cabal-store" v2-install --installdir="$PWD/.cabal-store/bin" happy
         cabal --store-dir=".cabal-store" v2-build --only-dependencies --enable-tests
     - name: Build
       run: |
-        export PATH="/usr/local/opt/ghc@${{matrix.ghcver}}/bin:$PATH"
+        export PATH="/usr/local/opt/ghc@${{matrix.ghcver}}/bin:$PWD/.cabal-store/bin:$PATH"
         cabal --store-dir=".cabal-store" v2-build
     - name: Copy binary
       shell: bash
@@ -72,7 +74,10 @@ jobs:
       run: cabal --store-dir=".cabal-store" v2-build -w "$Env:ghc" --only-dependencies --enable-tests
     - name: Build
       run: |
-        cabal --store-dir="$pwd\\.cabal-store" v2-install -w "$Env:ghc" alex
+        mkdir bin
+        $Env:Path += ";$pwd\\bin"
+        cabal --store-dir="$pwd\\.cabal-store" v2-install --installdir="$pwd\\bin" -w "$Env:ghc" alex
+        cabal --store-dir="$pwd\\.cabal-store" v2-install --installdir="$pwd\\bin" -w "$Env:ghc" happy
         cabal --store-dir=".cabal-store" v2-build -w "$Env:ghc"
     - name: Copy binary
       shell: bash
