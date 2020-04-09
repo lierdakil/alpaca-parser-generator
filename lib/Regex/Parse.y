@@ -26,8 +26,6 @@ import qualified Data.Text as T
   act  { TAction $$ }
   eof  { TEOF }
 
-%left '|'
-
 %%
 
 Def

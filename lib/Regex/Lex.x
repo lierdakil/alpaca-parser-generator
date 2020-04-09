@@ -1,4 +1,5 @@
 {
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 module Regex.Lex where
 import Data.Text (Text)
 import qualified Data.Text as T

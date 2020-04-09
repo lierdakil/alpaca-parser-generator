@@ -40,7 +40,6 @@ data RecursiveParserItemAlternatives
                  | MultiBody [(Lookahead, (Body, Maybe Text))]
 
 data Body = Body Text [(Symbol, RecursiveParserItemDoesReturn)]
-type ActionableRules = S.Set Text
 type Lookahead = S.Set (Maybe Symbol)
 
 buildRecursiveParser :: Monad m => Rules -> MyMonadT m RecursiveParser

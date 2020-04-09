@@ -1,4 +1,5 @@
 {
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Grammar.Lex where
 import Data.Text (Text, pack)
