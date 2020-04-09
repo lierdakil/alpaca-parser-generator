@@ -7,7 +7,7 @@ jobs:
     runs-on: macos-latest
     strategy:
       matrix:
-        ghcver: ["8.8"]
+        ghcver: ["8.6"]
     steps:
     - uses: actions/checkout@v2
     - name: Setup GHC
