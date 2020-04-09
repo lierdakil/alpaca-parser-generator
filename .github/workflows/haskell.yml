@@ -86,7 +86,7 @@ jobs:
         path: ./parser-generator-windows
 
   release:
-    needs: [linux, windows, macos]
+    needs: [windows, macos]
     runs-on: ubuntu-latest
     strategy:
       matrix:
