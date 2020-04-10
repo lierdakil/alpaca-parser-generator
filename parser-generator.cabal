@@ -4,10 +4,10 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 3676ef10483ae5dbb7a0554ecc4d01e5df2333ad5f550dd28ba906b3d1dd769b
+-- hash: 85302015270303aa3064a02efb4461c67efbbbe8069ce366a4ffefdc6f61b848
 
 name:                parser-generator
-version:             0.1.0.0
+version:             0.1.1.0
 license-file:        LICENSE
 author:              Nikolay Yakimov
 maintainer:          root@livid.pp.ru
