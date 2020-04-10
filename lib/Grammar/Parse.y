@@ -18,9 +18,9 @@ import qualified Data.Text as T
   term { TTerminal $$ }
   teof { TTermEof }
   nont { TNonTerminal $$ }
-  act  { TAction $$ }
+  braces { TBraces $$ }
   eof  { TEOF }
-  top  { TTop $$ }
+  top  { TTop }
   left { TLeft $$ }
   rght { TRight $$ }
   nona { TNonAssoc $$ }
@@ -31,7 +31,7 @@ Start
   : Tops Rules eof  { Grammar $1 ($2 []) }
 
 Tops
-  : Tops top        { $1 <> $2 }
+  : Tops top braces { $1 <> $3 }
   |                 { "" }
 
 Rules
@@ -55,8 +55,8 @@ Assoc
   |               { Nothing }
 
 Action
-  : act  { Just $1 }
-  |      { Nothing }
+  : braces  { Just $1 }
+  |         { Nothing }
 
 Body
   : Body Symbol           { $2:$1 }
