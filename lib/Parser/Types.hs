@@ -17,7 +17,7 @@ class Parser parser where
   buildParser :: Monad m => Proxy parser -> ParserOptions Rules -> MyMonadT m ([(FilePath,Text)], parser)
 
 class (Parser parser, Lang lang) => ParserWriter parser lang where
-  writeParser :: forall a. Proxy lang -> Text -> ParserOptions a -> parser -> [(FilePath,Text)]
+  writeParser :: Proxy lang -> Tops -> ParserOptions a -> parser -> [(FilePath,Text)]
 
 makeParser :: (Parser parser, ParserWriter parser lang, Monad m) => Proxy lang -> Proxy parser
            -> ParserOptions Text -> MyMonadT m [(FilePath,Text)]

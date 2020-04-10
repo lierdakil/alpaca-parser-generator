@@ -9,6 +9,7 @@ module Grammar (
   , BodyWithAction(..)
   , Assoc
   , AssocType(..)
+  , Tops(..)
   , parse
   , showBody
   , showSymbol

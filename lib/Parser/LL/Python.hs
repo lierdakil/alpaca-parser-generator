@@ -26,11 +26,11 @@ instance ParserWriter LLParser Python where
 from lexer import *
 from enum import IntEnum
 from collections import deque
-#{gtop}
+#{topTop gtop}
 class NonTerminal(IntEnum):
     #{indent 1 $ T.intercalate "\n" nonTermDefs}
 
-class #{className}:
+class #{className}#{topInh gtop}:
     M = [
         #{indent 2 $ T.intercalate ",\n" $ map (braces . T.intercalate "," . map showIdx') transTable}
     ]

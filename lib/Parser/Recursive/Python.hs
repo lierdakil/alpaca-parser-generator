@@ -25,8 +25,8 @@ instance ParserWriter RecursiveParser Python where
   writeParser _ gtop ParserOptions{..} RecursiveParser{..} =
     [(basename <> ".py", [interp|
 from lexer import TokenType
-#{gtop}
-class #{parserOptionsName}:
+#{topTop gtop}
+class #{parserOptionsName}#{topInh gtop}:
     def __init__(self, lexer, debug = False):
         self.lex = lexer
         self.debug = debug

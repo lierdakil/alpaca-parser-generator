@@ -33,8 +33,8 @@ instance ParserWriter LLParser CPP where
 #include <stack>
 #include <string>
 #include <variant>
-#{gtop}
-class #{className} {
+#{topTop gtop}
+class #{className}#{topInh gtop} {
   enum class NonTerminal : std::size_t { #{T.intercalate ", " (map ("NT_" <>) nonTerms)} };
   using Symbol = std::variant<NonTerminal, TokenType, std::size_t>;
   static const std::string to_string(NonTerminal nt);

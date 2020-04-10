@@ -28,8 +28,8 @@ instance ParserWriter RecursiveParser CPP where
 #ifndef #{headerName}_H
 #define #{headerName}_H
 #include "lexer.h"
-#{gtop}
-class #{parserOptionsName} {
+#{topTop gtop}
+class #{parserOptionsName}#{topInh gtop} {
   Lexer *lex;
   Token curTok;
   bool debug;

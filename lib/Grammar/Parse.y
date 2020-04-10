@@ -21,6 +21,7 @@ import qualified Data.Text as T
   braces { TBraces $$ }
   eof  { TEOF }
   top  { TTop }
+  inherit { TInherit }
   left { TLeft $$ }
   rght { TRight $$ }
   nona { TNonAssoc $$ }
@@ -31,8 +32,9 @@ Start
   : Tops Rules eof  { Grammar $1 ($2 []) }
 
 Tops
-  : Tops top braces { $1 <> $3 }
-  |                 { "" }
+  : Tops top braces     { $1{topTop = topTop $1 <> $3} }
+  | Tops inherit braces { $1{topInh = topInh $1 <> $3} }
+  |                     { Tops "" "" }
 
 Rules
   : Rules Rule { $1 . ($2 :) }
@@ -68,7 +70,8 @@ Symbol
   | teof                  { TermEof }
 
 {
-data Grammar = Grammar Text (NonEmpty Rule)
+data Grammar = Grammar Tops (NonEmpty Rule)
+data Tops = Tops { topTop :: Text, topInh :: Text }
 data Symbol = TermEof | Term Text | NonTerm Text deriving (Eq, Ord, Show)
 data Rule = Rule Text (NonEmpty BodyWithAction) deriving (Eq, Show)
 data BodyWithAction = BodyWithAction {

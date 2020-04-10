@@ -28,9 +28,9 @@ instance ParserWriter LLParser CSharp where
 using lexer;
 using System;
 using System.Collections.Generic;
-#{gtop}
+#{topTop gtop}
 namespace parser {
-public class #{className} {
+public class #{className}#{topInh gtop} {
   public enum NonTerminal : uint { #{T.intercalate ", " (map ("NT_" <>) nonTerms)} };
   private readonly Lexer lex;
   private readonly bool debug;

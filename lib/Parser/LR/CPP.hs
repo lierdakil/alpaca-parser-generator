@@ -30,8 +30,8 @@ instance LRPoint p => ParserWriter (LRParser p) CPP where
 #include "lexer.h"
 #include <stack>
 #include <variant>
-#{gtop}
-class #{name} {
+#{topTop gtop}
+class #{name}#{topInh gtop} {
   Lexer *lex;
   bool debug;
   std::stack<std::pair<std::size_t,std::variant<ResultType,Token>>> stack;

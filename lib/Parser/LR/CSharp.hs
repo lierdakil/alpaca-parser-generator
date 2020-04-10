@@ -27,9 +27,9 @@ instance LRPoint p => ParserWriter (LRParser p) CSharp where
 using lexer;
 using System;
 using System.Collections.Generic;
-#{gtop}
+#{topTop gtop}
 namespace parser {
-public class #{className} {
+public class #{className}#{topInh gtop} {
   private readonly Lexer lex;
   private readonly bool debug;
   private Stack<(uint state, dynamic value)> stack = new Stack<(uint state, dynamic value)>();

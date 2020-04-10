@@ -28,7 +28,7 @@ from lexer import *
 from enum import IntEnum
 from collections import deque
 
-#{gtop}
+#{topTop gtop}
 
 def stateToString(state):
   return [ #{stateToString} ][state]
@@ -36,7 +36,7 @@ def stateToString(state):
 def expectedSym(state):
   return [ #{expectedSym} ][state]
 
-class #{name}:
+class #{name}#{topInh gtop}:
     Action = [
         #{indent 2 actionTable}
         ]

@@ -26,9 +26,9 @@ instance ParserWriter RecursiveParser CSharp where
     [(basename <> ".cs", [interp|
 using lexer;
 using System;
-#{gtop}
+#{topTop gtop}
 namespace parser {
-class #{parserOptionsName} {
+class #{parserOptionsName}#{topInh gtop} {
   private readonly Lexer lex;
   private (TokenType type, dynamic attr) curTok;
   private readonly bool debug;
