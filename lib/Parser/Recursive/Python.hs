@@ -101,7 +101,7 @@ class #{parserOptionsName}#{topInh gtop}:
         -> [interp|self.parse_#{nt}();|]
       (s', _) -> [interp|
         if self.curTok[0] != TokenType.#{tok s'}:
-            raise Exception("Expected token #{tok s'}, but got " + str(curTok[0]))
+            raise Exception("Expected token #{tok s'}, but got " + str(self.curTok[0]))
         _#{n} = self.curTok
         self.curTok = self.lex.getNextToken()
         |]
