@@ -107,6 +107,6 @@ class #{parserOptionsName}#{topInh gtop} {
       (s', _) -> [interp|
         if(curTok.type != TokenType.#{tok s'})
           throw new ApplicationException($"Expected token #{tok s'}, but got {curTok.type}");
-        var _#{n} = curTok;
+        var _#{n} = curTok.Item2;
         curTok = lex.getNextToken();
         |]

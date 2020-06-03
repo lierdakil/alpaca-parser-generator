@@ -113,7 +113,7 @@ public class #{className}#{topInh gtop} {
           dynamic _#{i}=resultStack.Pop();
           |]
         showArg _ i = [interp|
-          (TokenType name, dynamic attr) _#{i}=resultStack.Pop();
+          var _#{i}=resultStack.Pop().Item2;
           |]
 
 encodeSymbol :: Symbol -> Text

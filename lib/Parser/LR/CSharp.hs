@@ -136,7 +136,7 @@ public class #{className}#{topInh gtop} {
         showArg (NonTerm _) i =
           [interp|dynamic _#{i}=stack.Pop().value;|]
         showArg _ i =
-          [interp|(TokenType name, dynamic attr) _#{i}=stack.Pop().value;|]
+          [interp|var _#{i}=stack.Pop().value.Item2;|]
     nonTermIdx nt = fromJust $ M.lookup nt nonTerminalsMap
     nonTerminalsMap = M.fromList $ zip nonTerminals [0::Word ..]
     quote x = "\"" <> x <> "\""
