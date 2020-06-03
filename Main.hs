@@ -17,6 +17,8 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import Options.Applicative hiding (Parser)
 import qualified Options.Applicative as OA
+import Data.Version
+import Paths_alpaca_parser_generator
 
 type MainProgram = Text -> FilePath -> FilePath -> IO ()
 
@@ -101,11 +103,17 @@ parser = (option (enumReader langTbl)
        ( help "Grammar input file"
       <> metavar "GRAMMARFILE" )
 
+versionFlag :: OA.Parser (IO () -> IO ())
+versionFlag = infoOption
+  ( showVersion version )
+  (  short 'v'
+  <> long "version"
+  <> help "Show version")
 
 main :: IO ()
 main = join $ execParser opts
   where
-  opts = info (parser <**> helper)
+  opts = info (parser <**> helper <**> versionFlag)
     ( fullDesc
    <> progDesc "ALPACA generates mostly human-readable, if somewhat\
       \ inefficient, simple parsers in multiple target languages."
