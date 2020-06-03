@@ -61,7 +61,7 @@ Token Lexer::getNextToken() {
   }
 #undef text
   if (curChIx == endIx) {
-  if (debug) std::cerr << "Got EOF while lexing \"" << text_ << "\"" << std::endl;
+  if (debug) std::cerr << "Got EOF while lexing \\"" << text_ << "\\"" << std::endl;
   return {TokenType::eof, ""}; }
   throw std::runtime_error("Unexpected input: " + std::string(startChIx, lastReadChIx));
 }
