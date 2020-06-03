@@ -113,14 +113,15 @@ ResultType #{className}::parse() {
     actionList = sortOn snd $ M.toList actionMap
     bodies = T.intercalate "\n" $ map (uncurry makeBody) actionList
     actions = T.intercalate "\n" $ map (uncurry makeAction) actionList
-    makeBody (b, _) n = [interp|
+    makeBody ((NonTerm nt, b), _) n = [interp|
     case #{showIdx n}:
-      if(debug) std::cerr << to_string(X) << " -> #{showBody b}" << std::endl;
+      if(debug) std::cerr << "#{nt} -> #{showBody b}" << std::endl;
       #{indent 1 . T.intercalate "\n" $ map pushSymbol (reverse b)}
       break;
     |] :: Text
+    makeBody _ _ = error "Should never happen"
     pushSymbol s = [interp|stack.push(#{encodeSymbol s});|] :: Text
-    makeAction (body, mcode) n = [interp|
+    makeAction ((_, body), mcode) n = [interp|
       case #{showIdx n}: {
         #{indent 1 $ T.intercalate "\n" (reverse $ zipWith showArg body [1::Word ..])}
         resultStack.push(#{act});

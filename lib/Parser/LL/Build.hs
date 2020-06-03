@@ -91,14 +91,15 @@ buildTable r = M.fromListWith (<>) $ foldMap (uncurry oneRule) rules
     firstAlpha = first r bwaBody
     firstAlphaNoEps = S.map fromJust (S.delete Nothing firstAlpha)
 
-indexTable :: LLParser -> ([[Maybe Word]], M.Map ([Symbol], Maybe Text) Word)
+indexTable :: LLParser -> ([[Maybe Word]], M.Map ((Symbol, [Symbol]), Maybe Text) Word)
 indexTable LLParser{..}
     = flip runState M.empty
     $ mapM (\nt -> mapM (makeCell nt) llTerminals) llNonTerminals
   where
   makeCell nt t
-    | Just x <- M.lookup (t, nt) llActions
+    | Just (b', a') <- M.lookup (t, nt) llActions
     = do
+        let x = ((nt, b'), a')
         am <- get
         let (ai, am')
                | Just i <- M.lookup x am = (i, am)

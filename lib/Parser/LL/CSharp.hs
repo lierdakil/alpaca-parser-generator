@@ -90,14 +90,15 @@ public class #{className}#{topInh gtop} {
     actionList = sortOn snd $ M.toList actionMap
     bodies = T.intercalate "\n" $ map (uncurry makeBody) actionList
     actions = T.intercalate "\n" $ map (uncurry makeAction) actionList
-    makeBody (b, _) n = [interp|
+    makeBody ((NonTerm nt, b), _) n = [interp|
     case #{showIdx n}:
-      if(debug) Console.Error.WriteLine($"{X} -> #{showBody b}");
+      if(debug) Console.Error.WriteLine("#{nt} -> #{showBody b}");
       #{indent 1 . T.intercalate "\n" $ map pushSymbol (reverse b)}
       break;
     |] :: Text
+    makeBody _ _ = error "Should never happen"
     pushSymbol s = [interp|stack.Push(#{encodeSymbol s});|] :: Text
-    makeAction (body, mcode) n = [interp|
+    makeAction ((_, body), mcode) n = [interp|
       case #{showIdx n}: {
         #{indent 1 $ T.intercalate "\n" (reverse $ zipWith showArg body [1::Word ..])}
         resultStack.Push(#{act});

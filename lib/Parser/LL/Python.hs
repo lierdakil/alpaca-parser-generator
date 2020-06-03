@@ -77,13 +77,14 @@ class #{className}#{topInh gtop}:
     actionList = sortOn snd $ M.toList actionMap
     bodies = map (uncurry makeBody) actionList
     actions = map (uncurry makeAction) actionList
-    makeBody (b, _) n = [interp|
+    makeBody ((NonTerm nt, b), _) n = [interp|
       elif trans == #{showIdx n}:
-          if self.debug: print(f"{X.name} -> #{showBody b}")
+          if self.debug: print("#{nt} -> #{showBody b}")
           #{indent 1 . T.intercalate "\n" $ map pushSymbol (reverse b)}
       |] :: Text
+    makeBody _ _ = error "Should never happen"
     pushSymbol s = [interp|self.stack.append(#{encodeSymbol s})|] :: Text
-    makeAction (body, mcode) n = [interp|
+    makeAction ((_, body), mcode) n = [interp|
       if X == #{showIdx n}:
           #{indent 1 $ T.intercalate "\n" (reverse $ zipWith showArg body [1::Word ..])}
           self.resultStack.append(#{act})
