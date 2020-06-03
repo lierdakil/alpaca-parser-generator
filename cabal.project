@@ -1,4 +1,4 @@
 packages: .
 
-package parser-generator
+package alpaca-parser-generator
   ghc-options: -Wall -j +RTS -A64m -RTS

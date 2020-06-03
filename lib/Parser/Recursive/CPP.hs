@@ -19,7 +19,6 @@ import qualified Data.Set as S
 import Data.List
 import qualified Control.Arrow as A
 import Parser.Recursive.Build
-import Lang
 
 instance ParserWriter RecursiveParser CPP where
   --writeParser :: forall a. Proxy lang -> ParserOptions a -> parser -> [(FilePath,Text)]

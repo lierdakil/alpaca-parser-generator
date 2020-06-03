@@ -1,6 +1,5 @@
 module Parser.LR (
     module Parser.Types
-  , module Lang
   , lr0Parser
   , lr1Parser
   , slrParser
@@ -16,7 +15,6 @@ import Parser.LR.CPP()
 import Parser.LR.CSharp()
 import Parser.LR.Python()
 import Data.Proxy
-import Lang
 
 lr1Parser :: Proxy (LRParser LR1Point)
 lr1Parser = Proxy

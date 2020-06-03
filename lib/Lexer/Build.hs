@@ -1,5 +1,8 @@
 {-# LANGUAGE TupleSections, FlexibleContexts, OverloadedStrings #-}
-module Lexer.Build (makeLexer) where
+module Lexer.Build (
+    module MonadTypes
+  , makeLexer
+  ) where
 
 import qualified Data.Map as M
 import qualified Data.Set as S

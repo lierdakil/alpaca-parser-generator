@@ -1,7 +1,7 @@
 module Lexer (
     module Lang
+  , module Lexer.Build
   , LexerWriter
-  , makeLexer
   ) where
 
 import Lexer.Types

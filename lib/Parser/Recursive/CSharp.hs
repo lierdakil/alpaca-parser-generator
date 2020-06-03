@@ -18,7 +18,6 @@ import Utils
 import Parser.Types
 import qualified Control.Arrow as A
 import Parser.Recursive.Build
-import Lang
 
 instance ParserWriter RecursiveParser CSharp where
   --writeParser :: forall a. Proxy lang -> ParserOptions a -> parser -> [(FilePath,Text)]

@@ -5,7 +5,6 @@ import Lexer
 import Parser.Recursive
 import Parser.LL
 import Parser.LR
-import MonadTypes
 
 import System.FilePath
 import System.Directory

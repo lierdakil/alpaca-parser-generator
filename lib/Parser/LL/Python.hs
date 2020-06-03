@@ -7,7 +7,6 @@
 module Parser.LL.Python () where
 
 import Parser.Types
-import Lang
 import Utils
 import Data.Maybe
 import Data.List
