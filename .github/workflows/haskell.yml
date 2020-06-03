@@ -36,13 +36,13 @@ jobs:
         cabal --store-dir=".cabal-store" v2-build
     - name: Copy binary
       shell: bash
-      run: find dist-newstyle -type f -perm +100 -name parser-generator -exec cp {} ./ \;
+      run: find dist-newstyle -type f -perm +100 -name alpaca -exec cp {} ./ \;
     - name: Package artifact
       shell: bash
       run: |
-        upx --best parser-generator
+        upx --best alpaca
         mkdir parser-generator-macos
-        mv parser-generator parser-generator-macos
+        mv alpaca parser-generator-macos
     - uses: actions/upload-artifact@v1
       with:
         name: macos-build
@@ -52,42 +52,47 @@ jobs:
     runs-on: windows-latest
     strategy:
       matrix:
-        cabalver: ["3.0"]
         ghcver: ["8.6.5"]
-    env:
-      GHC: "C:\\ProgramData\\chocolatey\\lib\\ghc\\tools\\ghc-${{matrix.ghcver}}\\bin\\ghc.exe"
     steps:
-    - uses: actions/checkout@v2
-    - name: Setup GHC
+    - name: Get GHC version
       run: |
-        choco install ghc --version ${{matrix.ghcver}} --ignore-dependencies
-        choco install cabal --version ${{matrix.cabalver}} --ignore-dependencies
+        $BinGhcPath = Join-Path $env:ChocolateyInstall "lib\ghc.${{matrix.ghcver}}\tools\ghc-${{matrix.ghcver}}\bin\"
+        echo "$BinGhcPath"
+        echo "::add-path::$BinGhcPath"
+    - name: Check GHC version
+      shell: bash
+      run: |
+        [ "$(ghc --numeric-version)" == "${{matrix.ghcver}}" ]
+    - uses: actions/checkout@v2
     - uses: actions/cache@v1
       id: cache
       with:
         path: .cabal-store
         key: ${{ runner.os }}-${{matrix.ghcver}}-${{ hashFiles('parser-generator.cabal') }}
-    - name: Cabal update
-      run: cabal --store-dir=".cabal-store" v2-update
+    - name: Cabal init/update
+      run: |
+        $store = Join-Path $pwd ".cabal-store"
+        cabal user-config init --augment="store-dir: $store" --augment="jobs: 1"
+        cabal v2-update
     - name: Install dependencies
       if: steps.cache.outputs.cache-hit != 'true'
-      run: cabal --store-dir=".cabal-store" v2-build -w "$Env:ghc" --only-dependencies --enable-tests
+      run: cabal v2-build --only-dependencies --enable-tests
     - name: Build
       run: |
         mkdir bin
         $Env:Path += ";$pwd\\bin"
-        cabal --store-dir="$pwd\\.cabal-store" v2-install --installdir="$pwd\\bin" -w "$Env:ghc" alex
-        cabal --store-dir="$pwd\\.cabal-store" v2-install --installdir="$pwd\\bin" -w "$Env:ghc" happy
-        cabal --store-dir=".cabal-store" v2-build -w "$Env:ghc"
+        cabal v2-install --install-method=copy --installdir="$pwd\\bin" alex
+        cabal v2-install --install-method=copy --installdir="$pwd\\bin" happy
+        cabal v2-build
     - name: Copy binary
       shell: bash
-      run: find dist-newstyle -type f -name parser-generator.exe -exec cp {} ./ \;
+      run: find dist-newstyle -type f -name alpaca.exe -exec cp {} ./ \;
     - name: Package artifact
       shell: bash
       run: |
-        7z a "parser-generator.exe.xz" parser-generator.exe
+        7z a "alpaca.exe.xz" alpaca.exe
         mkdir parser-generator-windows
-        mv parser-generator.exe.xz parser-generator-windows
+        mv alpaca.exe.xz parser-generator-windows
     - uses: actions/upload-artifact@v1
       with:
         name: windows-build
@@ -106,12 +111,12 @@ jobs:
         name: windows-build
     - name: Unpack assets
       run: |
-        unxz windows-build/parser-generator.exe.xz
+        unxz windows-build/alpaca.exe.xz
     - name: Repack assets
       run: |
         mkdir assets
         tar cJf assets/parser-generator-macos-${{github.sha}}.tar.xz -C macos-build parser-generator
-        7z a assets/parser-generator-windows-${{github.sha}}.7z windows-build/parser-generator.exe
+        7z a assets/parser-generator-windows-${{github.sha}}.7z windows-build/alpaca.exe
     - name: Create Release
       id: create_release
       uses: actions/create-release@v1
