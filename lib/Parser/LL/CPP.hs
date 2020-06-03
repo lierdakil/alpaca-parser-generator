@@ -68,23 +68,23 @@ ResultType #{className}::parse() {
         [&a, this](auto X) {
           using T = std::decay_t<decltype(X)>;
           if constexpr (std::is_same_v<T, TokenType>) {
-            if (a.type == X) {
+            if (a.first == X) {
               resultStack.push(std::move(a));
               a = lex->getNextToken();
               stack.pop();
             } else {
               throw std::runtime_error(
-                  "Found terminal " + ::to_string(a.type) + " but expected " +
+                  "Found terminal " + ::to_string(a.first) + " but expected " +
                   ::to_string(X) + ".");
             }
           } else if constexpr (std::is_same_v<T, NonTerminal>) {
             auto trans = M[static_cast<std::size_t>(X)]
-                              [static_cast<std::size_t>(a.type)];
+                              [static_cast<std::size_t>(a.first)];
             stack.pop();
             stack.push(trans);
             switch(trans) {
             case 0: throw std::runtime_error("No transition for "+to_string(X)+
-                      ", "+::to_string(a.type));
+                      ", "+::to_string(a.first));
             #{indent 6 bodies}
             }
           } else if constexpr (std::is_same_v<T, std::size_t>) {
@@ -137,7 +137,7 @@ ResultType #{className}::parse() {
           resultStack.pop();
           |]
         showArg _ i = [interp|
-          auto _#{tshow i}=std::move(std::get<1>(resultStack.top()));
+          auto _#{tshow i}=std::move(std::get<1>(resultStack.top()).second);
           resultStack.pop();
           |]
 

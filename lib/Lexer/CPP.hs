@@ -12,26 +12,17 @@ import Utils
 
 instance LexerWriter CPP where
   writeLexer _ accSt tokNames stList =
-    [ ( "tokenType.h", [interp|
-#ifndef TOKEN_TYPE_H
-#define TOKEN_TYPE_H
+    [ ("lexer.h", [interp|
+#ifndef LEXER_H
+#define LEXER_H
 #include <cstddef>
+#include <string>
+#include <utility>
 enum class TokenType : std::size_t {
   eof, #{T.intercalate "," (map ("Tok_"<>) tokNames)}
 };
-#endif
-|]), ("lexer.h", [interp|
-#ifndef LEXER_H
-#define LEXER_H
-#include <string>
-#include "tokenType.h"
 const std::string to_string(TokenType tt);
-#if __has_include("token.h")
-#include "token.h"
-#else
-struct Token{TokenType type; std::string text;};
-Token mkToken(TokenType type, const std::string_view &text = "");
-#endif
+using Token = std::pair<TokenType, std::string>;
 class Lexer {
   const std::string _input;
   const std::string_view input;
@@ -51,12 +42,6 @@ const std::string to_string(TokenType tt){
   static constexpr const char *names[] = { #{tokReflect} };
   return names[static_cast<std::size_t>(tt)];
 }
-#if __has_include("token.h")
-#else
-Token mkToken(TokenType type, const std::string_view &text) {
-  return Token{type, std::string(text)};
-}\n
-#endif\n
 Lexer::Lexer(const std::string &input, bool debug)
 : _input(input), input(_input), curChIx(input.cbegin()), endIx(input.cend()), debug(debug) {}
 Token Lexer::getNextToken() {
@@ -69,13 +54,15 @@ Token Lexer::getNextToken() {
   end:
   auto lastReadChIx = curChIx;
   curChIx = lastAccChIx;
-  std::string_view text(&*startChIx, std::distance(startChIx, curChIx));
+  std::string_view text_(&*startChIx, std::distance(startChIx, curChIx));
+#define text (std::string(text_))
   switch(accSt){
     #{indent 2 returnResult}
   }
+#undef text
   if (curChIx == endIx) {
-  if (debug) std::cerr << "Got EOF while lexing \"" << text << "\"" << std::endl;
-  return mkToken(TokenType::eof); }
+  if (debug) std::cerr << "Got EOF while lexing \"" << text_ << "\"" << std::endl;
+  return {TokenType::eof, ""}; }
   throw std::runtime_error("Unexpected input: " + std::string(startChIx, lastReadChIx));
 }
 |])]
@@ -103,14 +90,14 @@ Token Lexer::getNextToken() {
     returnResult1 (st, (Just name, act)) = [interp|
       case #{st}:
         if (debug) std::cerr << "Lexed token #{name}: \\"" << text << "\\"" << std::endl;
-        return mkToken(TokenType::Tok_#{name}#{mkAct act});
+        return {TokenType::Tok_#{name}#{mkAct act}};
       |]
     returnResult1 (st, (Nothing, _)) = [interp|
       case #{st}:
         if (debug) std::cerr << "Skipping state #{st}: \\"" << text << "\\"" << std::endl;
         goto start;
       |]
-    mkAct NoAction = ""
+    mkAct NoAction = ", \"\""
     mkAct (Action act) = "," <> act
     checkChars (charGroup, newSt) = "if(" <> charCond charGroup <> ") goto state_" <> tshow newSt <> ";"
     charCond = T.intercalate "||" . map charCond1 . NE.toList

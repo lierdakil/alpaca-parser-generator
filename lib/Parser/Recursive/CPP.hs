@@ -78,7 +78,7 @@ public:
       |] where alts' = map (A.first $ S.map fromJust) $ filter (all isJust . fst) alts
                alt | Just res <- find (S.member Nothing . fst) alts = uncurry makeBody (snd res)
                    | otherwise = [interp|
-                        throw std::runtime_error("No alternative matched while parsing nonterminal #{h}:" + to_string(curTok.type));
+                        throw std::runtime_error("No alternative matched while parsing nonterminal #{h}:" + to_string(curTok.first));
                       |]
 
     makeBody :: Body -> Maybe Text -> Text
@@ -103,7 +103,7 @@ public:
     checkLookahead la = T.intercalate " || " $ map cond $ S.toList la
       where
         cond :: Symbol -> Text
-        cond s = [interp|curTok.type == TokenType::#{tok s}|]
+        cond s = [interp|curTok.first == TokenType::#{tok s}|]
 
     tok :: Symbol -> Text
     tok TermEof = "eof"
@@ -117,8 +117,8 @@ public:
       (NonTerm nt, DoesNotReturnValue)
         -> [interp|parse_#{nt}();|]
       (s', _) -> [interp|
-        if(curTok.type != TokenType::#{tok s'})
-          throw std::runtime_error("Expected token #{tok s'}, but got " + to_string(curTok.type));
-        auto _#{n} = std::move(curTok);
+        if(curTok.first != TokenType::#{tok s'})
+          throw std::runtime_error("Expected token #{tok s'}, but got " + to_string(curTok.first));
+        auto _#{n} = std::move(curTok.second);
         curTok = lex->getNextToken();
         |]

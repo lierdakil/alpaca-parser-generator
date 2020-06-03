@@ -66,7 +66,7 @@ std::size_t #{name}::top() const { return stack.empty() ? 0 : stack.top().first;
 ResultType #{name}::parse() {
   Token a = lex->getNextToken();
   while (true) {
-    auto action = Action[top()][static_cast<std::size_t>(a.type)];
+    auto action = Action[top()][static_cast<std::size_t>(a.first)];
     switch (action) {
     #{indent 2 actionCases}
     default:
@@ -123,7 +123,7 @@ ResultType #{name}::parse() {
       while(!stack.empty()) { stack.pop(); parsed = stateToString(top()) + " " + parsed; }
       throw std::runtime_error(
         "Rejection state reached after parsing \\""+parsed+"\\", when encoutered symbol \\""
-        + ::to_string(a.type) + "\\" in state "
+        + ::to_string(a.first) + "\\" in state "
         + std::to_string(lastSt) + ". Expected \\"" + expectedSym(lastSt) +"\\"");
       |] :: Text
     actionBody (Shift _) = error "does not happen"
@@ -148,7 +148,7 @@ ResultType #{name}::parse() {
           | otherwise
           = "ResultType()"
         showArg (NonTerm _) i = "auto _"<>tshow i<>"=std::move(std::get<0>(stack.top().second)); stack.pop();"
-        showArg _ i = "auto _"<>tshow i<>"=std::move(std::get<1>(stack.top().second)); stack.pop();"
+        showArg _ i = "auto _"<>tshow i<>"=std::move(std::get<1>(stack.top().second).second); stack.pop();"
     nonTermIdx nt = fromJust $ M.lookup nt nonTerminalsMap
     nonTerminalsMap = M.fromList $ zip nonTerminals [0::Word ..]
     quote x = "\"" <> x <> "\""
