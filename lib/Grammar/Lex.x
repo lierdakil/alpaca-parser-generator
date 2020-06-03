@@ -23,7 +23,7 @@ tokens :-
 <0> ^\%inherit           { mkTok $ const TInherit }
 <0> \%left[0-9]+         { mkTok $ \s -> TLeft (read $ T.unpack (T.drop 5 s)) }
 <0> \%right[0-9]+        { mkTok $ \s -> TRight (read $ T.unpack (T.drop 6 s)) }
-<0> \%nonassoc[0-9]+     { mkTok $ \s -> TNonAssoc (read $ T.unpack (T.drop 9 s)) }
+<0> \%non[0-9]+          { mkTok $ \s -> TNonAssoc (read $ T.unpack (T.drop 4 s)) }
 
 <braces> [^\{\}]+        { saveBracesString }
 <braces> \n+             { saveBracesString }
