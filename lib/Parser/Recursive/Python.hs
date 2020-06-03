@@ -101,6 +101,6 @@ class #{parserOptionsName}#{topInh gtop}:
       (s', _) -> [interp|
         if self.curTok[0] != TokenType.#{tok s'}:
             raise Exception("Expected token #{tok s'}, but got " + str(self.curTok[0]))
-        _#{n} = self.curTok
+        _#{n} = self.curTok[1]
         self.curTok = self.lex.getNextToken()
         |]

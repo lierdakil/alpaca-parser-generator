@@ -126,7 +126,8 @@ class #{name}#{topInh gtop}:
           = T.strip code
           | otherwise
           = "None"
-        showArg _ i = [interp|_#{i} = self.stack.pop()[1]|]
+        showArg (NonTerm _) i = [interp|_#{i} = self.stack.pop()[1]|]
+        showArg _ i = [interp|_#{i} = self.stack.pop()[1][1]|]
     nonTermIdx nt = fromJust $ M.lookup nt nonTerminalsMap
     nonTerminalsMap = M.fromList $ zip nonTerminals [0::Word ..]
     quote x = "\"" <> x <> "\""

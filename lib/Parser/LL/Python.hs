@@ -94,7 +94,8 @@ class #{className}#{topInh gtop}:
             = [interp|(#{code})|]
             | otherwise
             = "None"
-        showArg _ i = [interp|_#{tshow i}=self.resultStack.pop()|]
+        showArg (NonTerm _) i = [interp|_#{tshow i}=self.resultStack.pop()|]
+        showArg _ i = [interp|_#{tshow i}=self.resultStack.pop()[1]|]
 
 encodeSymbol :: Symbol -> Text
 encodeSymbol (NonTerm nt) = "NonTerminal.NT_" <> nt
