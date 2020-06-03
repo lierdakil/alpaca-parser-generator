@@ -24,12 +24,14 @@ import Lexer.Types
 import Data.Proxy
 
 makeLexer :: (LexerWriter lang, Monad m) => Proxy lang
-           -> [Text] -> MyMonadT m [(FilePath,Text)]
-makeLexer lang input = do
+          -> Bool -> [Text] -> MyMonadT m [(FilePath,Text)]
+makeLexer lang outputDebug input = do
   defs <- liftEither . left T.lines $ mapM (fmap regex . scanLine) input
   let nfa = evalState (buildNFA defs) 0
       dfa = simplifyDFA . nfaToDFA $ nfa
-      debug = (("nfa.gv", nfaToGraphviz nfa) :) . (("dfa.gv", dfaToGraphviz dfa) :)
+      debug = if outputDebug
+        then (("nfa.gv", nfaToGraphviz nfa) :) . (("dfa.gv", dfaToGraphviz dfa) :)
+        else id
       stList = map (second (second M.toList)) $ IM.toList dfa
 
   accSt <- catMaybes <$> mapM (\(f, (s, _)) -> fmap (f,) <$> isSingle f s) stList

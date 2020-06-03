@@ -30,6 +30,8 @@ Available options:
                            Target language, default cpp
   -p,--parser recursive|rec|ll1|lr0|lr1|slr|lalr
                            Parser method, default lalr
+  --debug-lexer            Output lexer finite automata graphs in GraphViz
+                           format
   -n,--name NAME           Parser class name, default "Parser"
   -b,--basename FILENAME   Parser output file base name, default "parser"
   GRAMMARFILE              Grammar input file

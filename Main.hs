@@ -21,11 +21,11 @@ import qualified Options.Applicative as OA
 import Data.Version
 import Paths_alpaca_parser_generator
 
-type MainProgram = Text -> FilePath -> FilePath -> IO ()
+type MainProgram = Bool -> Text -> FilePath -> FilePath -> IO ()
 
 runProgram :: (LexerWriter lang, ParserWriter parser lang) =>
               Proxy lang -> Proxy parser -> MainProgram
-runProgram lang parserMethod parserName baseFileName inputFile = do
+runProgram lang parserMethod debugLexer parserName baseFileName inputFile = do
   input <- T.readFile inputFile
   let (lexicRaw, grammarLines) = second (drop 1) . break (=="%%") $ T.lines input
       rootdir = takeDirectory inputFile
@@ -33,7 +33,7 @@ runProgram lang parserMethod parserName baseFileName inputFile = do
       lexic = filter (not . T.null) lexicRaw
   setCurrentDirectory rootdir
   runInIO $ do
-    writeFiles =<< makeLexer lang lexic
+    writeFiles =<< makeLexer lang debugLexer lexic
     wrap parserName $ makeParser lang parserMethod ParserOptions{
         parserOptionsName = parserName
       , parserOptionsBaseFileName = baseFileName
@@ -88,6 +88,9 @@ parser = (option (enumReader langTbl)
       <> help "Parser method, default lalr"
       <> metavar (intercalate "|" (concatMap fst parsTbl))
       <> value (ParserProxy lalrParser)))
+  <*> switch
+       ( long "debug-lexer"
+      <> help "Output lexer finite automata graphs in GraphViz format")
   <*> strOption
        ( short 'n'
       <> long "name"
