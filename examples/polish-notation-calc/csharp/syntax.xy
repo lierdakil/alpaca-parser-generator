@@ -1,0 +1,18 @@
+number /[0-9]+/ double.Parse(text)
+add /\+/
+sub /\-/
+mul /\*/
+div /\//
+pow /\^/
+/ +/
+%%
+
+S : E %eof  { _1 }
+  ;
+E : add E E { _2 + _3 }
+  | sub E E { _2 - _3 }
+  | mul E E { _2 * _3 }
+  | div E E { _2 / _3 }
+  | pow E E { Math.Pow(_2, _3) }
+  | number  { _1 }
+  ;
