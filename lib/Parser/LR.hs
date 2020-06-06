@@ -18,6 +18,7 @@ import Parser.LR.SLR
 import Parser.LR.CPP()
 import Parser.LR.CSharp()
 import Parser.LR.Python()
+import Parser.LR.JS()
 import Data.Proxy
 
 type LR1Parser = LRParser LR1Point

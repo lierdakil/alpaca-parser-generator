@@ -52,17 +52,20 @@ langTbl = [
     (ncpp, \(ParserProxy p) -> runProgram cpp p)
   , (ncs , \(ParserProxy p) -> runProgram csharp p)
   , (npy , \(ParserProxy p) -> runProgram python p)
+  , (njs , \(ParserProxy p) -> runProgram js p)
   ]
   where
   ncpp = ["cpp", "c++"]
   ncs = ["c#", "csharp", "cs"]
   npy = ["python", "py"]
+  njs = ["js", "javascript"]
 
 data ParserProxy = forall p.
   ( Parser p
   , ParserWriter p CPP
   , ParserWriter p CSharp
   , ParserWriter p Python
+  , ParserWriter p JS
   ) => ParserProxy { unPP :: Proxy p }
 
 parsTbl :: [([String], ParserProxy)]

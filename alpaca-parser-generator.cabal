@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 9dbc175301f9a34aed84992c786503fa4605271c92dc588faef27bd2ec89c82f
+-- hash: c4fa5412e9836cb54fc68a107010b2abeb0796dc87e7ef63b8d1f76f377548b5
 
 name:           alpaca-parser-generator
 version:        0.1.2.1
@@ -28,6 +28,7 @@ executable alpaca
       Lexer.CPP
       Lexer.CSharp
       Lexer.FA
+      Lexer.JS
       Lexer.Python
       Lexer.Types
       MonadTypes
@@ -35,11 +36,13 @@ executable alpaca
       Parser.LL.Build
       Parser.LL.CPP
       Parser.LL.CSharp
+      Parser.LL.JS
       Parser.LL.Python
       Parser.LR
       Parser.LR.Build
       Parser.LR.CPP
       Parser.LR.CSharp
+      Parser.LR.JS
       Parser.LR.LALR
       Parser.LR.Point
       Parser.LR.Python
@@ -48,6 +51,7 @@ executable alpaca
       Parser.Recursive.Build
       Parser.Recursive.CPP
       Parser.Recursive.CSharp
+      Parser.Recursive.JS
       Parser.Recursive.Python
       Parser.Types
       Regex.Lex

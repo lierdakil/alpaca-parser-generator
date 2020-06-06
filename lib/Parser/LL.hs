@@ -9,6 +9,7 @@ import Parser.LL.Build
 import Parser.LL.CPP()
 import Parser.LL.CSharp()
 import Parser.LL.Python()
+import Parser.LL.JS()
 import Data.Proxy
 
 llParser :: Proxy LLParser

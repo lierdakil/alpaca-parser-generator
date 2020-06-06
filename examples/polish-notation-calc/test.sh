@@ -2,7 +2,11 @@
 
 export alpaca=$(cabal exec -- which alpaca)
 
-for d in cpp csharp py; do
+what="$@"
+
+[ -z "$what" ] && what="cpp csharp py nodejs"
+
+for d in $what; do
   pushd $d
   echo "Testing $d..."
   for parser in recursive ll1 lr0 lr1 slr lalr; do
