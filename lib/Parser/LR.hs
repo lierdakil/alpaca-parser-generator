@@ -4,6 +4,10 @@ module Parser.LR (
   , lr1Parser
   , slrParser
   , lalrParser
+  , LR1Parser
+  , LR0Parser
+  , SLRParser
+  , LALRParser
   ) where
 
 import Parser.Types
@@ -16,14 +20,19 @@ import Parser.LR.CSharp()
 import Parser.LR.Python()
 import Data.Proxy
 
-lr1Parser :: Proxy (LRParser LR1Point)
+type LR1Parser = LRParser LR1Point
+type LR0Parser = LRParser LR0Point
+type SLRParser = LRParser SLRPoint
+type LALRParser = LRParser LALRPoint
+
+lr1Parser :: Proxy LR1Parser
 lr1Parser = Proxy
 
-lr0Parser :: Proxy (LRParser LR0Point)
+lr0Parser :: Proxy LR0Parser
 lr0Parser = Proxy
 
-slrParser :: Proxy (LRParser SLRPoint)
+slrParser :: Proxy SLRParser
 slrParser = Proxy
 
-lalrParser :: Proxy (LRParser LALRPoint)
+lalrParser :: Proxy LALRParser
 lalrParser = Proxy

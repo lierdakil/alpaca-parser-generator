@@ -1,6 +1,7 @@
 module Parser.LL (
     module Parser.Types
   , llParser
+  , LLParser
   ) where
 
 import Parser.Types

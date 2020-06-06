@@ -1,6 +1,7 @@
 module Parser.Recursive (
     module Parser.Types
   , recursiveParser
+  , RecursiveParser
   ) where
 
 import Parser.Types
