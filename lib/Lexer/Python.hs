@@ -20,11 +20,10 @@ class TokenType(IntEnum):
     #{indent 1 tokDefns}
 
 class Lexer:
-    def __init__(self, input, debug = False, mkToken = lambda x, y=None: (x, y)):
+    def __init__(self, input, debug = False):
         self.input = input
         self.curChIx = 0
         self.debug = debug
-        self.mkToken = mkToken
 
     def getNextToken(self):
         lastAccChIx = self.curChIx
@@ -48,7 +47,7 @@ class Lexer:
         #{indent 2 returnResult}
         if self.curChIx >= len(self.input):
             if self.debug: print("Got EOF while lexing \\"" + text + "\\"")
-            return self.mkToken(TokenType.eof)
+            return (TokenType.eof, None)
         raise Exception("Unexpected input: " + self.input[startChIx:lastReadChIx])
 |])]
     where
@@ -58,7 +57,7 @@ class Lexer:
     returnResult1 (st, (Just name, act)) = [interp|
       if accSt == #{tshow st}:
           if self.debug: print("Lexed token #{name}: \\"" + text + "\\"")
-          return self.mkToken(TokenType.Tok_#{name}#{mkAct act})
+          return (TokenType.Tok_#{name}, #{mkAct act})
       |]
     returnResult1 (st, (Nothing, _)) = [interp|
       if accSt == #{tshow st}:
@@ -73,9 +72,9 @@ class Lexer:
           break
       |]
     transTable = T.intercalate "\nel" $ mapMaybe checkState stList
-    tokDefns = T.intercalate "\n" . map (\(x,n) -> "Tok_"<>x<>" = "<>tshow n) $ zip tokNames [1::Word ..]
-    mkAct NoAction = ""
-    mkAct (Action act) = "," <> act
+    tokDefns = T.intercalate "\n" $ zipWith (\x n -> [interp|Tok_#{x} = #{n}|] :: Text) tokNames [1::Word ..]
+    mkAct NoAction = "None"
+    mkAct (Action act) = act
     checkChars :: (NE.NonEmpty CharPattern, Int) -> Text
     checkChars (charGroup, newSt) = [interp|
       if #{charCond charGroup}:
