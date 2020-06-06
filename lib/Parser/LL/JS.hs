@@ -22,6 +22,8 @@ instance ParserWriter LLParser JS where
     where
     basename = parserOptionsBaseFileName
     sourceFile = [interp|
+'use strict'
+
 const {TokenType, tokToStr} = require('./lexer.js')
 #{topTop gtop}
 const NonTerminal = {

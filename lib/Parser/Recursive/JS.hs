@@ -22,6 +22,8 @@ import Parser.Recursive.Build
 instance ParserWriter RecursiveParser JS where
   writeParser _ gtop ParserOptions{..} RecursiveParser{..} =
     [(basename <> ".js", [interp|
+'use strict'
+
 const {tokToStr, TokenType} = require('./lexer.js')
 #{topTop gtop}
 class #{parserOptionsName}#{topInh gtop} {
