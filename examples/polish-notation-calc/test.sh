@@ -6,6 +6,8 @@ what="$@"
 
 [ -z "$what" ] && what="cpp csharp py nodejs"
 
+export input=${input:-+ 1 * 2 ^ 3 4}
+
 for d in $what; do
   pushd $d
   echo "Testing $d..."
