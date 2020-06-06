@@ -110,13 +110,13 @@ module.exports = {#{name}}
     }|] :: Maybe Text
     actionBody Reject = [interp|
       const lastSt = this._top()
-      const parsed = stateToString(lastSt)
+      const parsed = [stateToString(lastSt)]
       while (this.stack.length > 0) {
         this.stack.pop()
-        parsed = stateToString(this._top()) + " " + parsed
+        parsed.unshift(stateToString(this._top()))
       }
       throw new Error(
-        `Rejection state reached after parsing "${parsed}", when encoutered symbol "${tokToStr(a[0])}" in state ${lastSt}. Expected "${expectedSym(lastSt)}"`)
+        `Rejection state reached after parsing "${parsed.join(' ')}", when encoutered symbol "${tokToStr(a[0])}" in state ${lastSt}. Expected "${expectedSym(lastSt)}"`)
       |] :: Text
     actionBody (Shift _) = error "does not happen"
     actionBody (Reduce ((ExtendedStartRule, _), _)) = [interp|
