@@ -23,6 +23,7 @@ const TokenType = {
 
 function tokToStr(x) {
   switch(x) {
+    case 0: return '%eof'
     #{indent 2 tokToStr}
   }
 }
