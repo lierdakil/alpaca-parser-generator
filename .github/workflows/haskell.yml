@@ -17,13 +17,12 @@ jobs:
       id: cache
       with:
         path: .cabal-store
-        key: ${{ runner.os }}-${{ hashFiles('parser-generator.cabal') }}
+        key: ${{ runner.os }}-${{ hashFiles('alpaca-parser-generator.cabal') }}
     - name: Cabal update
       run: |
         export PATH="/usr/local/opt/ghc@${{matrix.ghcver}}/bin:$PATH"
         cabal --store-dir=".cabal-store" v2-update
     - name: Install dependencies
-      if: steps.cache.outputs.cache-hit != 'true'
       run: |
         mkdir bin
         export PATH="/usr/local/opt/ghc@${{matrix.ghcver}}/bin:$PWD/.cabal-store/bin:$PATH"
@@ -68,14 +67,13 @@ jobs:
       id: cache
       with:
         path: .cabal-store
-        key: ${{ runner.os }}-${{matrix.ghcver}}-${{ hashFiles('parser-generator.cabal') }}
+        key: ${{ runner.os }}-${{matrix.ghcver}}-${{ hashFiles('alpaca-parser-generator.cabal') }}
     - name: Cabal init/update
       run: |
         $store = Join-Path $pwd ".cabal-store"
         cabal user-config init --augment="store-dir: $store" --augment="jobs: 1"
         cabal v2-update
     - name: Install dependencies
-      if: steps.cache.outputs.cache-hit != 'true'
       run: cabal v2-build --only-dependencies --enable-tests
     - name: Build
       run: |
