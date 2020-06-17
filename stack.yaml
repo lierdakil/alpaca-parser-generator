@@ -4,3 +4,5 @@ packages:
 extra-deps:
 - table-layout-0.9.0.1
 - data-default-instances-base-0.1.0.1
+ghc-options:
+  '$targets': -Wall -j "+RTS -A64m -RTS"
