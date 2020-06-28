@@ -2,6 +2,7 @@
 module Main where
 
 import Lexer
+import Orphans()
 import Parser.Recursive
 import Parser.LL
 import Parser.LR
