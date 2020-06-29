@@ -27,10 +27,10 @@ class Lexer
     private $curChIx;
     private $debug;
 
-    public function __construct(string $input, int $curChIx, bool $debug)
+    public function __construct(string $input, bool $debug)
     {
         $this->input = $input;
-        $this->curChIx = $curChIx;
+        $this->curChIx = 0;
         $this->debug = $debug;
     }
 
@@ -50,7 +50,7 @@ class Lexer
         $accSt = -1;
         $curSt = 0;
         while ($curSt >= 0) {
-        if (in_array($curSt, [#{T.intercalate "," $ map (tshow . fst) accSt}])) {
+            if (in_array($curSt, [#{T.intercalate "," $ map (tshow . fst) accSt}])) {
                 $lastAccChIx = $this->curChIx;
                 $accSt = $curSt;
             }
@@ -68,13 +68,13 @@ class Lexer
 
         $lastReadChIx = $this->curChIx;
         $this->curChIx = $lastAccChIx;
-        $text = substr($this->input, $startChIx, $lastAccChIx);
+        $text = substr($this->input, $startChIx, $lastAccChIx - $startChIx);
         switch($accSt) {
-          #{indent 3 returnResult}
+            #{indent 3 returnResult}
         }
 
         if ($this->curChIx >= strlen($this->input)) {
-            if ($this->debug)  printf('Got EOF while lexing "%s"', $text);
+            if ($this->debug)  printf("Got EOF while lexing \\"%s\\"\\n", $text);
             return [self::TOKEN_TYPE_EOF, null];
         }
         throw new \\InvalidArgumentException("Unexpected input: " . substr($this->input, $startChIx, $lastReadChIx));
@@ -111,7 +111,7 @@ class Lexer
     checkChars (charGroup, newSt) = [interp|
         if (#{charCond charGroup}) {
             $curSt = #{newSt};
-            continue;
+            continue 2;
         }
       |]
     charCond = T.intercalate " || " . map charCond1 . NE.toList
