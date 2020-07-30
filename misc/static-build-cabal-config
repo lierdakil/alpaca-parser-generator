@@ -1,0 +1,7 @@
+package *
+    ghc-options: -fPIC -fasm -optl-static -optl-pthread +RTS -A64m -RTS
+    static: true
+    relocatable: true
+    split-sections: true
+    executable-stripping: true
+    shared: false

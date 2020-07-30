@@ -3,119 +3,95 @@ name: Haskell CI
 on: [push]
 
 jobs:
-  macos:
-    runs-on: macos-latest
+  build:
     strategy:
       matrix:
-        ghcver: ["8.6"]
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            container: 'lierdakil/alpine-haskell-gmp:8.8.3'
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
     steps:
     - uses: actions/checkout@v2
-    - name: Setup GHC
+    - name: Copy build config
+      if: runner.os == 'Linux'
       run: |
-        brew bundle --file=osx/Brewfile
-    - uses: actions/cache@v1
+        cp misc/static-build-cabal-config ./cabal.project.local
+    - uses: actions/setup-haskell@v1
+      if: runner.os != 'Linux'
+      with:
+        ghc-version: '8.8.4'
+        cabal-version: '3.2'
+    - uses: actions/cache@v2
       id: cache
       with:
-        path: .cabal-store
+        path: |
+          $PWD/.cabal-store
         key: ${{ runner.os }}-${{ hashFiles('alpaca-parser-generator.cabal') }}
-    - name: Cabal update
-      run: |
-        export PATH="/usr/local/opt/ghc@${{matrix.ghcver}}/bin:$PATH"
-        cabal --store-dir=".cabal-store" v2-update
-    - name: Install dependencies
-      run: |
-        mkdir bin
-        export PATH="/usr/local/opt/ghc@${{matrix.ghcver}}/bin:$PWD/.cabal-store/bin:$PATH"
-        cabal --store-dir="$PWD/.cabal-store" v2-install --installdir="$PWD/.cabal-store/bin" alex
-        cabal --store-dir="$PWD/.cabal-store" v2-install --installdir="$PWD/.cabal-store/bin" happy
-        cabal --store-dir=".cabal-store" v2-build --only-dependencies --enable-tests
-    - name: Build
-      run: |
-        export PATH="/usr/local/opt/ghc@${{matrix.ghcver}}/bin:$PWD/.cabal-store/bin:$PATH"
-        cabal --store-dir=".cabal-store" v2-build
-    - name: Copy binary
-      shell: bash
-      run: find dist-newstyle -type f -perm +100 -name alpaca -exec cp {} ./ \;
-    - name: Package artifact
-      shell: bash
-      run: |
-        upx --best alpaca
-        mkdir parser-generator-macos
-        mv alpaca parser-generator-macos
-    - uses: actions/upload-artifact@v1
-      with:
-        name: macos-build
-        path: parser-generator-macos
-
-  windows:
-    runs-on: windows-latest
-    strategy:
-      matrix:
-        ghcver: ["8.6.5"]
-    steps:
-    - name: Get GHC version
-      run: |
-        $BinGhcPath = Join-Path $env:ChocolateyInstall "lib\ghc.${{matrix.ghcver}}\tools\ghc-${{matrix.ghcver}}\bin\"
-        echo "$BinGhcPath"
-        echo "::add-path::$BinGhcPath"
-    - name: Check GHC version
-      shell: bash
-      run: |
-        [ "$(ghc --numeric-version)" == "${{matrix.ghcver}}" ]
-    - uses: actions/checkout@v2
-    - uses: actions/cache@v1
-      id: cache
-      with:
-        path: .cabal-store
-        key: ${{ runner.os }}-${{matrix.ghcver}}-${{ hashFiles('alpaca-parser-generator.cabal') }}
-    - name: Cabal init/update
+    - name: Cabal init (Windows)
+      if: runner.os == 'Windows'
       run: |
         $store = Join-Path $pwd ".cabal-store"
-        cabal user-config init --augment="store-dir: $store" --augment="jobs: 1"
-        cabal v2-update
-    - name: Install dependencies
-      run: cabal v2-build --only-dependencies --enable-tests
-    - name: Build
-      run: |
-        mkdir bin
-        $Env:Path += ";$pwd\\bin"
-        cabal v2-install --install-method=copy --installdir="$pwd\\bin" alex
-        cabal v2-install --install-method=copy --installdir="$pwd\\bin" happy
-        cabal v2-build
-    - name: Copy binary
+        $install = Join-Path $pwd "install"
+        mkdir "$store"
+        mkdir "$install"
+        cabal user-config init --force --augment="store-dir: $store" `
+          --augment="overwrite-policy: always" `
+          --augment="install-method: copy" `
+          --augment="installdir: $install"
+        $bindir = Join-Path $store "bin"
+        Write-Output "::add-path::$bindir"
+    - name: Cabal init
+      if: runner.os != 'Windows'
       shell: bash
-      run: find dist-newstyle -type f -name alpaca.exe -exec cp {} ./ \;
+      run: |
+        store="$PWD/.cabal-store"
+        install="$PWD/install"
+        mkdir -p "$store" "$install"
+        cabal user-config init --force --augment="store-dir: $store" \
+          --augment="overwrite-policy: always" \
+          --augment="install-method: copy" \
+          --augment="installdir: $install"
+        echo "::add-path::$store/bin"
+    - name: Cabal update
+      run: cabal v2-update
+    - name: Install dependencies
+      run: |
+        cabal v2-install --installdir=".cabal-store/bin" alex
+        cabal v2-install --installdir=".cabal-store/bin" happy
+        cabal v2-build --only-dependencies --enable-tests
+    - name: Build
+      run: cabal v2-install
     - name: Package artifact
       shell: bash
-      run: |
-        7z a "alpaca.exe.xz" alpaca.exe
-        mkdir parser-generator-windows
-        mv alpaca.exe.xz parser-generator-windows
-    - uses: actions/upload-artifact@v1
+      if: false
+      run: upx --best install/alpaca
+    - uses: actions/upload-artifact@v2
       with:
-        name: windows-build
-        path: ./parser-generator-windows
+        name: build-${{ runner.os }}
+        path: install
 
   release:
-    needs: [windows, macos]
-    if: contains(github.ref, 'tags/v')
+    needs: [build]
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/download-artifact@v1
-      with:
-        name: macos-build
-    - uses: actions/download-artifact@v1
-      with:
-        name: windows-build
-    - name: Unpack assets
-      run: |
-        unxz windows-build/alpaca.exe.xz
+    - uses: actions/download-artifact@v2
+      name: Download all artifacts
+    - name: show directory structure
+      run: find
     - name: Repack assets
       run: |
         mkdir assets
-        tar cJf assets/parser-generator-macos-${{github.sha}}.tar.xz -C macos-build alpaca
-        7z a assets/parser-generator-windows-${{github.sha}}.7z windows-build/alpaca.exe
+        tar cvJf assets/parser-generator-macos-${{github.sha}}.tar.xz -C build-macOS alpaca
+        tar cvJf assets/parser-generator-linux-${{github.sha}}.tar.xz -C build-Linux alpaca
+        7z a assets/parser-generator-windows-${{github.sha}}.7z build-Windows/alpaca.exe
+    - uses: actions/upload-artifact@v2
+      with:
+        name: release-assets
+        path: assets
     - name: Create Release
+      if: contains(github.ref, 'tags/v')
       id: create_release
       uses: actions/create-release@v1
       env:
@@ -125,11 +101,19 @@ jobs:
         release_name: ${{ github.ref }}
         draft: false
         prerelease: false
-        body: |
-          ${{ steps.get_version.outputs.version }}
+    - name: Upload Release Asset Linux
+      if: contains(github.ref, 'tags/v')
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./assets/parser-generator-linux-${{github.sha}}.tar.xz
+        asset_name: alpaca-parser-generator-Linux.tar.xz
+        asset_content_type: application/x-xz-compressed-tar
     - name: Upload Release Asset macOS
       if: contains(github.ref, 'tags/v')
-      uses: actions/upload-release-asset@v1.0.1
+      uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
@@ -139,7 +123,7 @@ jobs:
         asset_content_type: application/x-xz-compressed-tar
     - name: Upload Release Asset Windows
       if: contains(github.ref, 'tags/v')
-      uses: actions/upload-release-asset@v1.0.1
+      uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
