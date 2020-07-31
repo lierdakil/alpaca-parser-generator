@@ -10,6 +10,7 @@ Supported target languages:
 - C++ (C++17 or newer)
 - C# (tested with C# 7)
 - Python (tested with python 3.6 and 3.7)
+- JavaScript
 
 Supported parser algorithms:
 
@@ -21,12 +22,13 @@ Supported parser algorithms:
 - LALR
 
 ```
-Usage: alpaca [-l|--lang cpp|c++|c#|csharp|cs|python|py]
-              [-p|--parser recursive|rec|ll1|lr0|lr1|slr|lalr] [-n|--name NAME]
-              [-b|--basename FILENAME] GRAMMARFILE [-v|--version]
+Usage: alpaca [-l|--lang cpp|c++|c#|csharp|cs|python|py|js|javascript]
+              [-p|--parser recursive|rec|ll1|lr0|lr1|slr|lalr] [--debug-lexer]
+              [-n|--name NAME] [-b|--basename FILENAME] GRAMMARFILE
+              [-v|--version]
 
 Available options:
-  -l,--lang cpp|c++|c#|csharp|cs|python|py
+  -l,--lang cpp|c++|c#|csharp|cs|python|py|js|javascript
                            Target language, default cpp
   -p,--parser recursive|rec|ll1|lr0|lr1|slr|lalr
                            Parser method, default lalr
