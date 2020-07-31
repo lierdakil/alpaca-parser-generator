@@ -7,6 +7,7 @@ import Regex.Parse
 import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.IntSet as IS
 import Lexer.Types
 import Lang
 import Utils
@@ -48,24 +49,9 @@ class Lexer
         $lastAccChIx = $this->curChIx;
         $startChIx = $this->curChIx;
         $accSt = -1;
-        $curSt = 0;
-        while ($curSt >= 0) {
-            if (in_array($curSt, [#{T.intercalate "," $ map (tshow . fst) accSt}])) {
-                $lastAccChIx = $this->curChIx;
-                $accSt = $curSt;
-            }
-
-            if ($this->curChIx >= strlen($this->input))
-                break;
-
-            $curCh = $this->input[$this->curChIx];
-            $this->curChIx+=1;
-            switch($curSt) {
-                #{indent 4 transTable}
-            }
-            break;
-        }
-
+        $len = strlen($this->input);
+        #{indent 2 transTable}
+        end:
         $lastReadChIx = $this->curChIx;
         $this->curChIx = $lastAccChIx;
         $text = substr($this->input, $startChIx, $lastAccChIx - $startChIx);
@@ -73,7 +59,7 @@ class Lexer
             #{indent 3 returnResult}
         }
 
-        if ($this->curChIx >= strlen($this->input)) {
+        if ($this->curChIx >= $len) {
             if ($this->debug)  printf("Got EOF while lexing \\"%s\\"\\n", $text);
             return [self::TOKEN_TYPE_EOF, null];
         }
@@ -95,12 +81,22 @@ class Lexer
             if ($this->debug) printf("Skipping state #{tshow st}: \\"%s\\"\\n", $text);
             return $this->getNextToken();
         |]
+    accStS = IS.fromList $ map fst accSt
+    checkAccepting st
+      | st `IS.member` accStS = [interp|
+        $lastAccChIx = $this->curChIx;
+        $accSt = #{st};
+        |] :: Text
+      | otherwise = ""
     checkState :: (Int, (a, [(NE.NonEmpty CharPattern, Int)])) -> Maybe Text
-    checkState (_, (_, [])) = Nothing
     checkState (curSt, (_, charTrans)) = Just [interp|
-      case #{tshow curSt}:
-        #{indent 1 $ T.intercalate " else " (map checkChars charTrans)}
-        break;
+      state_#{curSt}:
+          #{indent 1 $ checkAccepting curSt}
+          if ($this->curChIx >= $len) goto end;
+          $curCh = $this->input[$this->curChIx];
+          $this->curChIx+=1;
+          #{indent 1 $ T.intercalate "\nelse " $ map checkChars charTrans}
+          goto end;
       |]
     transTable = T.intercalate "\n" $ mapMaybe checkState stList
     tokDefns = T.intercalate "\n" $ zipWith (\x n -> [interp|const TOKEN_TYPE_#{T.toUpper x} = #{n};|] :: Text) tokNames [1::Word ..]
@@ -109,11 +105,8 @@ class Lexer
     mkAct (Action act) = act
     checkChars :: (NE.NonEmpty CharPattern, Int) -> Text
     checkChars (charGroup, newSt) = [interp|
-        if (#{charCond charGroup}) {
-            $curSt = #{newSt};
-            continue 2;
-        }
-      |]
+        if (#{charCond charGroup}) goto state_#{newSt};
+        |]
     charCond = T.intercalate " || " . map charCond1 . NE.toList
     charCond1 :: CharPattern -> Text
     charCond1 (CChar c) = [interp|$curCh === #{tshow c}|]
