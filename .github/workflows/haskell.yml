@@ -8,52 +8,41 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         include:
-          - os: ubuntu-latest
-            container: 'lierdakil/alpine-haskell-gmp:8.8.3'
+        - os: ubuntu-latest
+          container: 'lierdakil/alpine-haskell-gmp:8.8.3-pwsh'
     runs-on: ${{ matrix.os }}
     container: ${{ matrix.container }}
     steps:
     - uses: actions/checkout@v2
     - name: Copy build config
       if: runner.os == 'Linux'
-      run: |
-        cp misc/static-build-cabal-config ./cabal.project.local
+      run: cp misc/static-build-cabal-config ./cabal.project.local
     - uses: actions/setup-haskell@v1
       if: runner.os != 'Linux'
       with:
         ghc-version: '8.8.4'
         cabal-version: '3.2'
+    - name: Fix Linux cache
+      if: runner.os == 'Linux'
+      run: apk add --no-cache --update tar
     - uses: actions/cache@v2
       id: cache
       with:
-        path: |
-          $PWD/.cabal-store
-        key: ${{ runner.os }}-${{ hashFiles('alpaca-parser-generator.cabal') }}
-    - name: Cabal init (Windows)
-      if: runner.os == 'Windows'
+        path: .cabal-store
+        key: ${{ runner.os }}-${{ hashFiles('alpaca-parser-generator.cabal') }}-a
+    - name: Cabal init
+      shell: pwsh
       run: |
         $store = Join-Path $pwd ".cabal-store"
         $install = Join-Path $pwd "install"
-        mkdir "$store"
-        mkdir "$install"
+        New-Item -ItemType Directory -Force "$store"
+        New-Item -ItemType Directory -Force "$install"
         cabal user-config init --force --augment="store-dir: $store" `
           --augment="overwrite-policy: always" `
           --augment="install-method: copy" `
           --augment="installdir: $install"
         $bindir = Join-Path $store "bin"
         Write-Output "::add-path::$bindir"
-    - name: Cabal init
-      if: runner.os != 'Windows'
-      shell: bash
-      run: |
-        store="$PWD/.cabal-store"
-        install="$PWD/install"
-        mkdir -p "$store" "$install"
-        cabal user-config init --force --augment="store-dir: $store" \
-          --augment="overwrite-policy: always" \
-          --augment="install-method: copy" \
-          --augment="installdir: $install"
-        echo "::add-path::$store/bin"
     - name: Cabal update
       run: cabal v2-update
     - name: Install dependencies
@@ -63,10 +52,6 @@ jobs:
         cabal v2-build --only-dependencies --enable-tests
     - name: Build
       run: cabal v2-install
-    - name: Package artifact
-      shell: bash
-      if: false
-      run: upx --best install/alpaca
     - uses: actions/upload-artifact@v2
       with:
         name: build-${{ runner.os }}
@@ -76,58 +61,28 @@ jobs:
     needs: [build]
     runs-on: ubuntu-latest
     steps:
+    - uses: actions/checkout@v2
     - uses: actions/download-artifact@v2
       name: Download all artifacts
-    - name: show directory structure
-      run: find
     - name: Repack assets
       run: |
         mkdir assets
-        tar cvJf assets/parser-generator-macos-${{github.sha}}.tar.xz -C build-macOS alpaca
-        tar cvJf assets/parser-generator-linux-${{github.sha}}.tar.xz -C build-Linux alpaca
-        7z a assets/parser-generator-windows-${{github.sha}}.7z build-Windows/alpaca.exe
+        tar cvJf assets/alpaca-parser-generator-macOS.tar.xz -C build-macOS alpaca
+        tar cvJf assets/alpaca-parser-generator-Linux.tar.xz -C build-Linux alpaca
+        7z a assets/alpaca-parser-generator-Windows.7z build-Windows/alpaca.exe
     - uses: actions/upload-artifact@v2
       with:
         name: release-assets
         path: assets
-    - name: Create Release
+    - name: Create release
       if: contains(github.ref, 'tags/v')
-      id: create_release
-      uses: actions/create-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.ref }}
-        release_name: ${{ github.ref }}
-        draft: false
-        prerelease: false
-    - name: Upload Release Asset Linux
-      if: contains(github.ref, 'tags/v')
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./assets/parser-generator-linux-${{github.sha}}.tar.xz
-        asset_name: alpaca-parser-generator-Linux.tar.xz
-        asset_content_type: application/x-xz-compressed-tar
-    - name: Upload Release Asset macOS
-      if: contains(github.ref, 'tags/v')
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./assets/parser-generator-macos-${{github.sha}}.tar.xz
-        asset_name: alpaca-parser-generator-macOS.tar.xz
-        asset_content_type: application/x-xz-compressed-tar
-    - name: Upload Release Asset Windows
-      if: contains(github.ref, 'tags/v')
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./assets/parser-generator-windows-${{github.sha}}.7z
-        asset_name: alpaca-parser-generator-Windows.7z
-        asset_content_type: application/x-7z-compressed
+      run: |
+        set -x
+        assets=()
+        for asset in assets/*; do
+          assets+=("-a" "$asset")
+        done
+        tag_name="${GITHUB_REF##*/}"
+        hub release create "${assets[@]}" -m "$tag_name" "$tag_name"
