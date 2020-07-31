@@ -87,14 +87,14 @@ class Lexer
     returnResult1 :: (Int, (Maybe Text, Action)) -> Text
     returnResult1 (st, (Just name, act)) = [interp|
         case #{st}:
-            if ($this->debug) printf('Lexed token #{name}: "%s"', $text);
+            if ($this->debug) printf("Lexed token #{name}: \\"%s\\"\\n", $text);
             return [self::TOKEN_TYPE_#{T.toUpper name}, #{mkAct act}];
-      |]
+        |]
     returnResult1 (st, (Nothing, _)) = [interp|
         case #{st}:
-            if ($this->debug) printf('Skipping state #{tshow st}: "%s"', $text);
+            if ($this->debug) printf("Skipping state #{tshow st}: \\"%s\\"\\n", $text);
             return $this->getNextToken();
-      |]
+        |]
     checkState :: (Int, (a, [(NE.NonEmpty CharPattern, Int)])) -> Maybe Text
     checkState (_, (_, [])) = Nothing
     checkState (curSt, (_, charTrans)) = Just [interp|
