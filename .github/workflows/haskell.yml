@@ -7,6 +7,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+        ghc: ['8.8.4']
         include:
         - os: ubuntu-latest
           container: 'lierdakil/alpine-haskell:8.8.4-pwsh'
@@ -17,19 +18,11 @@ jobs:
     container: ${{ matrix.container }}
     steps:
     - uses: actions/checkout@v2
-    - name: Copy build config
-      if: matrix.config
-      run: cp misc/${{ matrix.config }} ./cabal.project.local
     - uses: actions/setup-haskell@v1
       if: runner.os != 'Linux'
       with:
-        ghc-version: '8.8.4'
+        ghc-version: ${{matrix.ghc}}
         cabal-version: '3.2'
-    - uses: actions/cache@v2
-      id: cache
-      with:
-        path: .cabal-store
-        key: ${{ runner.os }}-${{ hashFiles('alpaca-parser-generator.cabal') }}-a
     - name: Cabal init
       shell: pwsh
       run: |
@@ -45,6 +38,20 @@ jobs:
         Write-Output "::add-path::$bindir"
     - name: Cabal update
       run: cabal v2-update
+    - name: Cabal configure
+      run: cabal v2-configure
+    - name: Copy build config
+      if: matrix.config
+      run: cp misc/${{ matrix.config }} ./cabal.project.local
+    - uses: actions/cache@v2
+      id: cache
+      with:
+        path: .cabal-store
+        key: ${{runner.os}}-${{matrix.ghc}}-${{hashFiles('alpaca-parser-generator.cabal')}}-${{hashFiles('dist-newstyle/cache/plan.json')}}
+        restore-keys: |
+          ${{runner.os}}-${{matrix.ghc}}-${{hashFiles('alpaca-parser-generator.cabal')}}-${{hashFiles('dist-newstyle/cache/plan.json')}}
+          ${{runner.os}}-${{matrix.ghc}}-${{hashFiles('alpaca-parser-generator.cabal')}}
+          ${{runner.os}}-${{matrix.ghc}}
     - name: Install dependencies
       run: |
         cabal v2-install --installdir=".cabal-store/bin" alex
