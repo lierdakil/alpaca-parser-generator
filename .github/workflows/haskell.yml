@@ -9,7 +9,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
         include:
         - os: ubuntu-latest
-          container: 'lierdakil/alpine-haskell-gmp:8.8.3-pwsh'
+          container: 'lierdakil/alpine-haskell:8.8.4-pwsh'
     runs-on: ${{ matrix.os }}
     container: ${{ matrix.container }}
     steps:
@@ -22,9 +22,6 @@ jobs:
       with:
         ghc-version: '8.8.4'
         cabal-version: '3.2'
-    - name: Fix Linux cache
-      if: runner.os == 'Linux'
-      run: apk add --no-cache --update tar
     - uses: actions/cache@v2
       id: cache
       with:
