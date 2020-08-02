@@ -10,13 +10,16 @@ jobs:
         include:
         - os: ubuntu-latest
           container: 'lierdakil/alpine-haskell:8.8.4-pwsh'
+          config: static-build-cabal-config
+        - os: windows-latest
+          config: dynamic-build-cabal-config
     runs-on: ${{ matrix.os }}
     container: ${{ matrix.container }}
     steps:
     - uses: actions/checkout@v2
     - name: Copy build config
-      if: runner.os == 'Linux'
-      run: cp misc/static-build-cabal-config ./cabal.project.local
+      if: matrix.config
+      run: cp misc/${{ matrix.config }} ./cabal.project.local
     - uses: actions/setup-haskell@v1
       if: runner.os != 'Linux'
       with:

@@ -2,3 +2,4 @@ packages: .
 
 package alpaca-parser-generator
   ghc-options: -Wall -j +RTS -A64m -RTS
+  executable-stripping: true
