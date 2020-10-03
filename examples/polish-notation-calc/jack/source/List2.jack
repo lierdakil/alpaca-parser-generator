@@ -1,0 +1,40 @@
+// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/09/List/List.jack
+
+/** Represents a linked list of integers. */
+class List2 {
+    field String key;          // a list consists of a data field,
+    field int value;          // a list consists of a data field,
+    field List2 next;         // followed by a list
+
+    /* Creates a List. */
+    constructor List2 new(String k, int val, List2 rest) {
+      let key = k;
+      let value = val;
+      let next = rest;
+      return this;
+    }
+
+    /** Accessors. */
+    method int getKey() { return key; }
+    method int getVal() { return value; }
+    method List2 getNext() { return next; }
+
+    method void setVal(int v) { let value = v; return; }
+
+    /** Disposes this List by recursively disposing its tail. */
+    method void dispose() {
+      if (~(next = null)) {
+          do next.dispose();
+      }
+      do key.dispose();
+      // Uses an OS routine to recycle this object.
+      do Memory.deAlloc(this);
+      return;
+    }
+
+    // More list processing methods can come here.
+
+}

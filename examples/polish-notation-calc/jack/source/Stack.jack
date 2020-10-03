@@ -1,0 +1,63 @@
+/** Stack abstraction over linked lists */
+class Stack {
+  /** Linked list */
+  field List _list;
+
+  /** Construct empty stack */
+  constructor Stack new() {
+    let _list = null;
+    return this;
+  }
+
+  /** Deallocate stack */
+  method void dispose() {
+    do clear();
+    do Memory.deAlloc(this);
+    return;
+  }
+
+  /** Deallocate list */
+  method void clear() {
+    if(~(_list = null)){
+      do _list.dispose();
+    }
+    return;
+  }
+
+  /** Return top of the stack; Returns null if empty */
+  method int top() {
+    if (_list = null) {
+      return null;
+    } else {
+      return _list.getData();
+    }
+  }
+
+  /** Push an arbitrary value onto stack
+    * In terms of C, argument should be void*
+    */
+  method void push(int val) {
+    let _list = List.new(val, _list);
+    return;
+  }
+
+  /** Pop item from the top of the stack
+    * returns pointer to popped item data
+    * deallocates the list wrapper
+    * returns null if empty
+    */
+  method int pop() {
+    var List t;
+    var int d;
+    if(_list = null) {
+      return null;
+    } else {
+      let d = _list.getData();
+      let t = _list.getNext();
+      // use dealloc directly as to not destroy t
+      do Memory.deAlloc(_list);
+      let _list = t;
+      return d;
+    }
+  }
+}

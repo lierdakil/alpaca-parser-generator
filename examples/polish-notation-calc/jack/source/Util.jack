@@ -1,0 +1,132 @@
+/** Class with miscellaneous static utilities */
+class Util {
+  /** Create a copy of a given string */
+  function String copyString(String str) {
+    var String res;
+    var int len, i;
+    let len = str.length();
+    let res = String.new(len);
+    let i = 0;
+    while(i < len) {
+      do res.appendChar(str.charAt(i));
+      let i = i+1;
+    }
+    return res;
+  }
+
+  /** Compare two strings */
+  function boolean strcmp(String a, String b) {
+    var int len, i;
+    let len = a.length();
+    if (~(len = b.length())) {
+      return false;
+    }
+    let i = 0;
+    while(i < len) {
+      if(~(a.charAt(i) = b.charAt(i))) {
+        return false;
+      }
+      let i = i+1;
+    }
+    return true;
+  }
+
+  /** Divide by 2 with round-to-even ("banker's rounding") */
+  function int div2RoundToEven(int n) {
+    if ((n&3) = 3) {
+      return (n+1)/2;
+    } else {
+      return n/2;
+    }
+  }
+
+  /** Scrolls screen 2 text lines up by copying video memory*/
+  function void newline() {
+    do Util.newlineN(2);
+    return;
+  }
+
+  /** Scrolls screen 1 text lines up by copying video memory*/
+  function void newline1() {
+    do Util.newlineN(1);
+    return;
+  }
+
+  /** Scrolls screen num text lines up by copying video memory*/
+  function void newlineN(int num) {
+    var Array screen;
+    var int row, col;
+    let screen = 16384;
+    // 256 rows, 32 words per row
+    do Output.moveCursor(0,0);
+    let row = 0;
+    while (row < (11*(23-num))) {
+      let col = 0;
+      while(col<32) {
+        let screen[(row*32)+col] = screen[(row+(11*num))*32+col];
+        let col = col + 1;
+      }
+      let row = row + 1;
+    }
+    while (row < 256) {
+      let col = 0;
+      while(col<32) {
+        let screen[row*32+col] = 0;
+        let col = col + 1;
+      }
+      let row = row + 1;
+    }
+    do Output.moveCursor(21,0);
+    return;
+  }
+
+  /** Prints greeting text on screen */
+  function void printGreeting() {
+    do Screen.clearScreen();
+    do Output.moveCursor(0,0);
+    //                    |----------------------------------------------------------------|
+    do Output.printString("                Simple fractional calculator");
+    do Output.println();//|----------------------------------------------------------------|
+    do Output.printString("");
+    do Output.println();//|----------------------------------------------------------------|
+    do Output.printString("This program implements a simple fractional calculator.");
+    do Output.println();//|----------------------------------------------------------------|
+    do Output.printString("Basic algebraic operations +, -, *, / are supported.");
+    do Output.println();//|----------------------------------------------------------------|
+    do Output.printString("Operator precedence and associativity is observed.");
+    do Output.println();//|----------------------------------------------------------------|
+    do Output.printString("Grouping expressions with () is supported.");
+    do Output.println();//|----------------------------------------------------------------|
+    do Output.printString("Approximations for constants PI, E, PHI are defined.");
+    do Output.println();//|----------------------------------------------------------------|
+    do Output.printString("Numbers can contain a decimal fraction up to 4 digits");
+    do Output.println();//|----------------------------------------------------------------|
+    do Output.printString("(other digits are truncated).");
+    do Output.println();//|----------------------------------------------------------------|
+    do Output.printString("Approximate decimal fractions are also printed as the answer.");
+    do Output.println();//|----------------------------------------------------------------|
+    do Output.printString("User-defined variables can be defined using = operator.");
+    do Output.println();//|----------------------------------------------------------------|
+    do Output.printString("Defined variables can be viewed by using the MEM command.");
+    do Output.println();//|----------------------------------------------------------------|
+    do Output.printString("ABS function that returns absolute value of arugment is defined");
+    do Output.println();//|----------------------------------------------------------------|
+    do Output.printString("If you need to see this message again, use HELP command.");
+    do Output.println();//|----------------------------------------------------------------|
+    do Output.printString("Some examples:");
+    do Output.println();//|----------------------------------------------------------------|
+    do Output.printString("(1+0.5)*2 yields 3");
+    do Output.println();//|----------------------------------------------------------------|
+    do Output.printString("4/-4 yields -1");
+    do Output.println();//|----------------------------------------------------------------|
+    do Output.printString("X = 123 yields 123 and sets user-defined variable X to 123");
+    do Output.println();//|----------------------------------------------------------------|
+    do Output.printString("ABS(-1) yields 1");
+    do Output.println();//|----------------------------------------------------------------|
+    do Output.printString("");
+    do Output.println();//|----------------------------------------------------------------|
+    do Output.printString("Input the expression and press <Enter>");
+    do Output.println();//|----------------------------------------------------------------|
+    return;
+  }
+}

@@ -1,0 +1,30 @@
+number /[0-9]+(\.[0-9]*)?/ Fraction.fromString(text)
+add /\+/
+sub /\-/
+mul /\*/
+div /\//
+lp /\(/
+rp /\)/
+abs /ABS/
+mem /MEM/
+help /HELP/
+id /[A-Z]+/ Util.copyString(text)
+eq /=/
+/ +/
+%%
+
+S : E %eof   { _1 }
+  | mem %eof { Variables.print() }
+  | help %eof { Util.printGreeting() }
+  ;
+E : %left1 E add E { Fraction.add(_1, _3) }
+  | %left1 E sub E { Fraction.sub(_1, _3) }
+  | %left2 E mul E { Fraction.mul(_1, _3) }
+  | %left2 E div E { Fraction.div(_1, _3) }
+  | %left3 sub E   { Fraction.neg(_2) }
+  | number  { _1 }
+  | abs lp E rp { Fraction.abs(_3) }
+  | %non9 id eq E { Variables.set(_1, _3) }
+  | id { Variables.get(_1) }
+  | lp E rp { _2 }
+  ;

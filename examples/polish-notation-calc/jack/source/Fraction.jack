@@ -1,0 +1,230 @@
+// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/09/Fraction/Fraction.jack
+
+/** Represents the Fraction type and related operations. */
+class Fraction {
+  field int numerator, denominator;  // field = property = member variable.
+
+  /** Constructs a (reduced) fraction from the given numerator and denominator. */
+  constructor Fraction new(int x, int y) {
+    let numerator = x;
+    let denominator = y;
+    do reduce();   // reduces the fraction
+    return this;   // a constructor is expected to return a reference to the new object
+  }
+
+  // Reduces this fraction.
+  method void reduce() {
+    var int g;
+    if(denominator < 0) {
+      let numerator = -numerator;
+      let denominator = -denominator;
+    }
+    let g = Fraction.gcd(numerator, denominator);
+    if (g > 1) {
+      let numerator = numerator / g;
+      let denominator = denominator / g;
+    }
+    return;
+  }
+
+  /** Accessors. */
+  method int getNumerator() { return numerator; }
+  method int getDenominator() { return denominator; }
+
+  /** Returns the sum of two fractions
+    * disposes of arguments
+    */
+  function Fraction add(Fraction a, Fraction b) {
+    var int sum;
+    var Fraction res;
+    let sum = (a.getNumerator() * b.getDenominator()) + (b.getNumerator() * a.getDenominator());
+    let res = Fraction.new(sum, a.getDenominator() * b.getDenominator());
+    do a.dispose();
+    do b.dispose();
+    return res;
+  }
+
+  /** Returns the difference of two fractions
+    * disposes of arguments
+    */
+  function Fraction sub(Fraction a, Fraction b) {
+    var int sum;
+    var Fraction res;
+    let sum = (a.getNumerator() * b.getDenominator()) - (b.getNumerator() * a.getDenominator());
+    let res = Fraction.new(sum, a.getDenominator() * b.getDenominator());
+    do a.dispose();
+    do b.dispose();
+    return res;
+  }
+
+  /** Returns the product of two fractions
+    * disposes of arguments
+    */
+  function Fraction mul(Fraction a, Fraction b) {
+    var Fraction res;
+    let res = Fraction.new(
+        a.getNumerator() * b.getNumerator(),
+        a.getDenominator() * b.getDenominator());
+    do a.dispose();
+    do b.dispose();
+    return res;
+  }
+
+  /** Returns the quotient of two fractions
+    * disposes of arguments
+    */
+  function Fraction div(Fraction a, Fraction b) {
+    var Fraction res;
+    let res = Fraction.new(
+        a.getNumerator() * b.getDenominator(),
+        a.getDenominator() * b.getNumerator());
+    do a.dispose();
+    do b.dispose();
+    return res;
+  }
+
+  /** Returns the absolute value of the argument
+    * disposes of argument
+    */
+  function Fraction abs(Fraction a) {
+    var Fraction res;
+    var int num;
+    let num = a.getNumerator();
+    if (num < 0) {
+      let num = -num;
+    }
+    let res = Fraction.new(num, a.getDenominator());
+    do a.dispose();
+    return res;
+  }
+
+  /** Returns new fraction that is a negation of argument
+    * Disposes of argument
+    */
+  function Fraction neg(Fraction a) {
+    var Fraction res;
+    let res = Fraction.new(-a.getNumerator(), a.getDenominator());
+    do a.dispose();
+    return res;
+  }
+
+  /** Returns true if a > b */
+  function boolean gt(Fraction a, Fraction b) {
+    var int sum;
+    let sum = (a.getNumerator() * b.getDenominator()) - (b.getNumerator() * a.getDenominator());
+    return sum > 0;
+  }
+
+  /** Disposes this fraction. */
+  method void dispose() {
+    do Memory.deAlloc(this);  // uses an OS routine to recycle the memory held by the object
+    return;
+  }
+
+  /** Prints this fraction in the format x/y. */
+  method void print() {
+    do Output.printInt(numerator);
+    if (denominator > 1) {
+      do Output.printString("/");
+      do Output.printInt(denominator);
+      do Output.printString(" ( ");
+      do printDecimal();
+      do Output.printString(" )");
+    }
+    return;
+  }
+
+  /** Prints this fraction as decimal expansion to 6 places */
+  method void printDecimal() {
+    var int n, d, t, i;
+    let n = numerator;
+    let d = denominator;
+    if (n < 0) {
+      let n = -n;
+      do Output.printString("-");
+    }
+    // whole part
+    let t = n/d;
+    let n = n - (t*d); // fraction
+    do Output.printInt(t);
+    if (n > 0) {
+      do Output.printString(".");
+      let i = 6;
+      while ((i > 0) & (n > 0)) {
+        // need to reduce fractions
+        // because multiplying by 10
+        // will overflow
+        while(n > 3276) {
+          let n = Util.div2RoundToEven(n);
+          let d = Util.div2RoundToEven(d);
+        }
+        let n = n*10;
+        let t = n/d;
+        let n = n - (t*d); // fraction
+        do Output.printInt(t);
+        let i = i - 1;
+      }
+    }
+    if (n>0) {
+      do Output.printString("...");
+    }
+    return;
+  }
+
+  // Computes the greatest common divisor of the given integers.
+  function int gcd(int a, int b) {
+    var int r;
+    while (~(b = 0)) {             // applies Euclid's algorithm
+      let r = a - (b * (a / b));  // r = remainder of the integer division a/b
+      let a = b; let b = r;
+    }
+    return a;
+  }
+
+  /** Constructs a fraction from string representing decimal fraction
+    * of the format X...X.Y...Y, e.g. 123.456
+    * Only 4 decimal places of the fraction are used,
+    * the rest is truncated. This is due to the limitation
+    * of the format.
+    */
+  function Fraction fromString(String text) {
+    var int dpos, epos, i, w, f, fe, l, c;
+    var boolean frac;
+    var String temp;
+    let frac = false;
+    let l = text.length();
+    let temp = String.new(l);
+    let i = 0;
+    while (i < l) {
+      let c = text.charAt(i);
+      if(c = 46) {// .
+        let w = temp.intValue();
+        do temp.dispose();
+        let frac = true;
+        let l = Math.min(l, i+5);
+        let temp = String.new(l-i);
+      } else {
+        do temp.appendChar(c);
+      }
+      let i = i+1;
+    }
+    if (frac) {
+      let f = temp.intValue();
+      let l = temp.length();
+      let fe = 1;
+      while(l > 0) {
+        let fe = fe * 10;
+        let l = l - 1;
+      }
+      do temp.dispose();
+      return Fraction.new(w*fe+f, fe);
+    } else {
+      let w = temp.intValue();
+      do temp.dispose();
+      return Fraction.new(w, 1);
+    }
+  }
+}

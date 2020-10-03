@@ -1,0 +1,34 @@
+class Main {
+  /** main entrypoint; handles basic IO */
+  function void main() {
+    var String input;
+    var Lexer lex;
+    var Parser pars;
+    var Fraction result;
+    do Variables.init();
+    // define some variables
+    do Variables.set("PI", Fraction.new(355, 113));
+    do Variables.set("E", Fraction.new(27180, 9999));
+    do Variables.set("PHI",Fraction.new(10946, 6765));
+    // init parser
+    do Parser.init();
+    let input=null;
+    let lex = Lexer.new();
+    let pars = Parser.new(lex);
+    do Util.printGreeting();
+    do Output.moveCursor(21,0);
+    // main loop
+    while(true) {
+      let input = Keyboard.readLine("> ");
+      do lex.setInput(input);
+      let result = pars.parse();
+      do input.dispose();
+      if (~(result = 0)) {
+        do result.print();
+        do Util.newline();
+        do result.dispose();
+      }
+    }
+    return;
+  }
+}

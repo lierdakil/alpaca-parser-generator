@@ -1,0 +1,38 @@
+/** Static class for variable storage */
+class Variables {
+  static HashMap variables;
+
+  function void init() {
+    let variables = HashMap.new(256);
+    return;
+  }
+
+  function Fraction get(String s) {
+    var Fraction res;
+    let res = variables.get(s);
+    do s.dispose();
+    if (res = null) {
+      return Fraction.new(0, 1);
+    } else {
+      return Fraction.new(res.getNumerator(), res.getDenominator());
+    }
+  }
+
+  function Fraction set(String s, Fraction v) {
+    var Fraction t;
+    let t = variables.get(s);
+    if (~(t = null)) {
+      do t.dispose();
+    }
+    do variables.set(s, Fraction.new(v.getNumerator(), v.getDenominator()));
+    do s.dispose();
+    return v;
+  }
+
+  function void print() {
+    do Output.printString("Variables:");
+    do Util.newline();
+    do variables.print();
+    return;
+  }
+}

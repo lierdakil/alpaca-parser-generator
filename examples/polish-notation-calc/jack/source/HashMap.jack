@@ -1,0 +1,94 @@
+class HashMap {
+  field Array _buckets;
+  field int _size;
+
+  constructor HashMap new(int size) {
+    let _size = size;
+    let _buckets = Array.new(size);
+    return this;
+  }
+
+  method int get(String key) {
+    var int h, t;
+    var List2 l;
+    let h = HashMap.hash(key);
+    let t = h/_size;
+    let h = h - (t*_size); // modulo _size
+    let l = _buckets[h];
+    while(~(l = null)) {
+      if(Util.strcmp(l.getKey(), key)) {
+          return l.getVal();
+      }
+      let l = l.getNext();
+    }
+    return null;
+  }
+
+  method void set(String key, int value) {
+    var int h, t;
+    var List2 l;
+    let h = HashMap.hash(key);
+    let t = h/_size;
+    let h = h - (t*_size); // modulo _size
+    let l = _buckets[h];
+    while(~(l = null)) {
+      if(Utils.strcmp(l.getKey(), key)) {
+          do l.setVal(value);
+          return;
+      }
+      let l = l.getNext();
+    }
+    let _buckets[h] = List2.new(Util.copyString(key), value, _buckets[h]);
+    return;
+  }
+
+  method void dispose() {
+    var int i;
+    var List2 t;
+    let i = 0;
+    while (i < _size) {
+      let t = _buckets[i];
+      if (~(t = null)) {
+        do t.dispose();
+      }
+      let i = i+1;
+    }
+    do _buckets.dispose();
+    return;
+  }
+
+  method void print() {
+    var int i;
+    var List2 t;
+    var Fraction f;
+    let i = 0;
+    while (i < _size) {
+      let t = _buckets[i];
+      while (~(t = null)) {
+        do Output.printString(t.getKey());
+        do Output.printString(" = ");
+        let f = t.getVal();
+        do f.print();
+        let t = t.getNext();
+        do Util.newline1();
+      }
+      let i = i+1;
+    }
+    return;
+  }
+
+  /** variation of djb2 hash function */
+  function int hash(String s) {
+    var int h, i, len;
+    var char c;
+    let h = 5381;
+    let len = s.length();
+    let i = 0;
+    while (i < len) {
+      let h = (h*33) + s.charAt(i);
+      if (h < 0) { let h = -h; }
+      let i = i + 1;
+    }
+    return h;
+  }
+}
