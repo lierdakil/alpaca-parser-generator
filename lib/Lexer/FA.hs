@@ -7,6 +7,7 @@ module Lexer.FA (
   , simplifyDFA
   , nfaToGraphviz
   , dfaToGraphviz
+  , StateData(..)
   ) where
 
 import Regex.Parse (Action, CharPattern(..))
@@ -24,7 +25,8 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Utils
 
-type StateAttr = S.Set (Maybe Text, Action)
+data StateData = StateData { saNum :: Int, saName :: Maybe Text, saAct :: Action } deriving (Show, Eq, Ord)
+type StateAttr = S.Set StateData
 type NFA = IM.IntMap (StateAttr, M.Map (Maybe (NonEmpty CharPattern)) [Int])
 type DFA = IM.IntMap (StateAttr, M.Map (NonEmpty CharPattern) Int)
 
@@ -33,7 +35,7 @@ nfaToGraphviz fa = "digraph{rankdir=LR;" <> foldMap node l <> "}"
   where l = IM.toList fa
         node (i, (a, t)) = tshow i <> "[label=\""<> T.intercalate "/" lbl <> "\"" <> acc <> "];"
                                   <> foldMap (trans i) (M.toList t)
-                           where lbl = mapMaybe fst $ S.toList a
+                           where lbl = mapMaybe saName $ S.toList a
                                  acc = if not $ null lbl then ", peripheries=2" else ""
         trans i (c, ss) = foldMap (\s -> tshow i <> " -> " <> tshow s <> "[label=\""<> showCharPattern c<>"\"];") ss
 
@@ -42,7 +44,7 @@ dfaToGraphviz fa = "digraph{rankdir=LR;" <> foldMap node l <> "}"
   where l = IM.toList fa
         node (i, (a, t)) = tshow i <> "[label=\""<> T.intercalate "/" lbl <>"\"" <> acc <> "];"
                                   <> foldMap (trans i) (M.toList t)
-                           where lbl = mapMaybe fst $ S.toList a
+                           where lbl = mapMaybe saName $ S.toList a
                                  acc = if not $ null lbl then ", peripheries=2" else ""
         trans i (c, ss) = (\s -> tshow i <> " -> " <> tshow s <> "[label=\""<> showCharPattern (Just c)<>"\"];") ss
 
@@ -75,16 +77,33 @@ nfaToDFASt nfa = do
   where
   u0 (a1, m1) (a2, m2) = (a1 <> a2, M.unionWith u1 m1 m2)
   u1 a b = if a == b then a else error "Multiple-state transition in DFA"
-  moves = M.toList . M.unionsWith (<>) . map moves1 . IS.toList
+  moves = enrich . M.toList . M.unionsWith (<>) . map moves1 . IS.toList
   moves1 st
     | Just (_, trans) <- IM.lookup st nfa
-    = M.mapKeysMonotonic fromJust . M.delete Nothing $ trans
+    = M.map IS.fromList . M.mapKeysMonotonic fromJust . M.delete Nothing $ trans
     | otherwise = M.empty
+  enrich xs =
+    let r = map (enrich1 xs) xs
+    in if r /= xs then enrich r else r
+  enrich1 r (k, v) = (k, IS.unions (v:mapMaybe (getByK k) r))
+  getByK k1 (k2, v) | contains k2 k1 = Just v
+                    | otherwise = Nothing
+  contains k2 k1 = any (contains' k1) $ NE.toList k2
+  contains' k1 k2 = any (contains'' k2) $ NE.toList k1
+  -- this function is asymmetric because we want to
+  -- prefer more concrete definitions to less concrete,
+  -- i.e. prefer char to range, etc.
+  contains'' CAny _ = True
+  contains'' _ CAny = False -- nothing contains any
+  contains'' CChar{} CRange{} = False -- char doesn't contain range
+  contains'' (CChar c1) (CChar c2) = c1 == c2
+  contains'' (CRange a b) (CChar c1) = c1 >= a && c1 <= b
+  contains'' (CRange a b) (CRange c d) = a <= c && b >= d
 
 ecls :: Ord a =>
           IM.IntMap (StateAttr, M.Map (Maybe a) [IS.Key])
-          -> [IS.Key] -> (StateAttr, IS.IntSet)
-ecls nfa = ecls' (S.empty, IS.empty)
+          -> IS.IntSet -> (StateAttr, IS.IntSet)
+ecls nfa = ecls' (S.empty, IS.empty) . IS.toList
   where
   ecls' accum@(accAttr, accStates) (x:xs)
     | x `IS.member` accStates = ecls' accum xs
@@ -116,4 +135,4 @@ simplifyDFA dfa = IM.fromList $ mapMaybe simpDFA lst
 
 nfaToDFA :: NFA -> DFA
 nfaToDFA nfa = evalState (nfaToDFASt nfa)
- (0, IS.empty, [(0,) $ ecls nfa [0]])
+ (0, IS.empty, [(0,) $ ecls nfa $ IS.singleton 0])

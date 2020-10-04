@@ -1,4 +1,4 @@
-{-# LANGUAGE TupleSections, FlexibleContexts, OverloadedStrings #-}
+{-# LANGUAGE TupleSections, FlexibleContexts, OverloadedStrings, RecordWildCards #-}
 module Lexer.Build (
     module MonadTypes
   , makeLexer
@@ -35,17 +35,22 @@ makeLexer lang outputDebug input = do
       stList = map (second (second M.toList)) $ IM.toList dfa
 
   accSt <- catMaybes <$> mapM (\(f, (s, _)) -> fmap (f,) <$> isSingle f s) stList
-  let tokNames = nub $ mapMaybe (fst . snd) accSt
+  let tokNames = nub $ mapMaybe (saName . snd) accSt
       terminals = TermEof : map Term tokNames
+      accSt' = map (second (\x -> (saName x, saAct x))) accSt
   put terminals
-  return . debug $ writeLexer lang accSt tokNames stList
+  return . debug $ writeLexer lang accSt' tokNames stList
   where
     isSingle f xs
       | S.null xs = return Nothing
       | S.size xs == 1 = return $ Just (S.findMin xs)
       | otherwise = do
-        tell ["Lexer: Multiple actions/tokens match the same state " <> tshow f <> ": " <> tshow xs <> ". Choosing the first option."]
+        tell ["Lexer: Multiple actions/tokens match the same state " <> tshow f <> ": " <> T.intercalate ", " (map showSD $ S.toList xs) <> ". Choosing the first option."]
         return (Just $ S.findMin xs)
+    showSD StateData{saName=Just nm, saNum=num}
+      = nm <> " (line " <> tshow num <> ")"
+    showSD StateData{saName=Nothing, saNum=num}
+      = "<unnamed> (line " <> tshow num <> ")"
 
 newState :: State Int Int
 newState = state $ \s -> (s+1, s+1)
@@ -101,19 +106,19 @@ regexToNFASt = foldr
   (\p -> (IM.unionWith mapUnion <$> regex1ToNFASt p <*>))
   (return IM.empty)
 
-regexToNFA :: (Maybe Text, Action) -> RegexPattern -> State Int NFA
-regexToNFA (name, action) pat = do
+regexToNFA :: (Int, Maybe Text, Action) -> RegexPattern -> State Int NFA
+regexToNFA (num, name, action) pat = do
   res1 <- regexToNFASt pat
   lastSt <- get
-  return $ IM.insertWith mapUnion lastSt (S.singleton (name, action), M.empty) res1
+  return $ IM.insertWith mapUnion lastSt (S.singleton (StateData num name action), M.empty) res1
 
-build1NFA :: RegexDef -> State Int NFA
-build1NFA (RegexDef mbname pat mbact) = regexToNFA (mbname, mbact) pat
+build1NFA :: Int -> RegexDef -> State Int NFA
+build1NFA num (RegexDef mbname pat mbact) = regexToNFA (num, mbname, mbact) pat
 -- build1DFA = fmap (simplifyDFA . nfaToDFA . regexToNFA . regex) . scan
 
 buildNFA :: [RegexDef] -> State Int NFA
-buildNFA [x] = build1NFA x
-buildNFA xs = altNFA False $ map build1NFA xs
+buildNFA [x] = build1NFA 1 x
+buildNFA xs = altNFA False $ zipWith build1NFA [1..] xs
 
 scanLine :: Text -> Either Text [Token]
 scanLine s = left T.pack $ runAlex (T.unpack s) go
