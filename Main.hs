@@ -28,7 +28,7 @@ runProgram :: (LexerWriter lang, ParserWriter parser lang) =>
               Proxy lang -> Proxy parser -> MainProgram
 runProgram lang parserMethod debugLexer parserName baseFileName inputFile = do
   input <- T.readFile inputFile
-  let (lexicRaw, grammarLines) = second (drop 1) . break (=="%%") $ T.lines input
+  let (lexicRaw, grammarLines) = second (drop 1) . break ((=="%%") . T.filter (/='\r')) $ T.lines input
       rootdir = takeDirectory inputFile
       grammar = T.unlines grammarLines
       lexic = filter (not . T.null) lexicRaw
