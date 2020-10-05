@@ -1,3 +1,10 @@
+## 0.1.3.1
+
+-   [Lexer] Rework ambiguity handler, use more efficient algorithm
+-   [Main] Handle CR character
+-   [Lexer] Detect and resolve some ambiguities and pattern intersections
+-   Add orphans to make each new language immediately buildable
+
 ## 0.1.3.0
 
 -   [CI] Updates + static Linux build
