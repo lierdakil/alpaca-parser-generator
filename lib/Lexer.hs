@@ -10,4 +10,5 @@ import Lexer.CPP()
 import Lexer.CSharp()
 import Lexer.Python()
 import Lexer.JS()
+import Lexer.PHP()
 import Lang

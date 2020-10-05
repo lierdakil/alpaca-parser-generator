@@ -54,12 +54,14 @@ langTbl = [
   , (ncs , \(ParserProxy p) -> runProgram csharp p)
   , (npy , \(ParserProxy p) -> runProgram python p)
   , (njs , \(ParserProxy p) -> runProgram js p)
+  , (nphp , \(ParserProxy p) -> runProgram php p)
   ]
   where
   ncpp = ["cpp", "c++"]
   ncs = ["c#", "csharp", "cs"]
   npy = ["python", "py"]
   njs = ["js", "javascript"]
+  nphp = ["php"]
 
 data ParserProxy = forall p.
   ( Parser p
