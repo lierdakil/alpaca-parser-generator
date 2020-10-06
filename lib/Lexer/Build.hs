@@ -9,6 +9,8 @@ import qualified Data.Set as S
 import Control.Monad.State
 import qualified Data.IntMap as IM
 import Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.List.NonEmpty as NE
+import Data.Function (on)
 import Data.List
 import Data.Maybe
 import Control.Arrow
@@ -32,7 +34,7 @@ makeLexer lang outputDebug input = do
       debug = if outputDebug
         then (("nfa.gv", nfaToGraphviz nfa) :) . (("dfa.gv", dfaToGraphviz dfa) :)
         else id
-      stList = map (second (second M.toList)) $ IM.toList dfa
+      stList = map (second (second (sortCharPatterns . M.toList))) $ IM.toList dfa
 
   accSt <- catMaybes <$> mapM (\(f, (s, _)) -> fmap (f,) <$> isSingle f s) stList
   let tokNames = nub $ mapMaybe (saName . snd) accSt
@@ -51,6 +53,23 @@ makeLexer lang outputDebug input = do
       = nm <> " (line " <> tshow num <> ")"
     showSD StateData{saName=Nothing, saNum=num}
       = "<unnamed> (line " <> tshow num <> ")"
+
+sortCharPatterns :: [(NonEmpty CharPattern, Int)] -> [(NonEmpty CharPattern, Int)]
+sortCharPatterns = sortBy (cmp `on` fst)
+  where
+    cmp a b | bina && ainb = EQ
+            | bina = GT
+            | ainb = LT
+            | otherwise = EQ
+      where ainb = contains' b a
+            bina = contains' a b
+    contains' a b = all (\bi -> any (`contains` bi) (NE.toList a)) (NE.toList b)
+    contains CAny _ = True
+    contains _ CAny = False -- nothing contains any
+    contains CChar{} CRange{} = False -- char doesn't contain range
+    contains (CChar c1) (CChar c2) = c1 == c2
+    contains (CRange a b) (CChar c1) = c1 >= a && c1 <= b
+    contains (CRange a b) (CRange c d) = a <= c && b >= d
 
 newState :: State Int Int
 newState = state $ \s -> (s+1, s+1)
