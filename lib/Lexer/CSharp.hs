@@ -90,3 +90,4 @@ public class Lexer {
     charCond1 (CRange c1 c2) =
       [interp|(curCh >= '#{c1}' && curCh <= '#{c2}')|]
     charCond1 CAny = "true"
+    charCond1 (CNot c) = "!(" <> charCond1 c <> ")"

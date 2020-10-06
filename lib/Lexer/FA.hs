@@ -8,6 +8,7 @@ module Lexer.FA (
   , nfaToGraphviz
   , dfaToGraphviz
   , StateData(..)
+  , containsCR
   ) where
 
 import Regex.Parse (Action, CharPattern(..))
@@ -56,6 +57,7 @@ showCharPattern (Just (x :| rest)) = foldMap show1 $ x : rest
         show1 (CChar c) = tshow' c
         show1 (CRange a b) = "[" <> tshow' a <> "-" <> tshow' b <> "]"
         show1 CAny = "."
+        show1 (CNot c) = "~" <> show1 c
         tshow' = T.replace "\\" "\\\\" . tshow
 
 nfaToDFASt :: NFA -> State (Int, IS.IntSet, [(Int, (StateAttr, IS.IntSet))]) DFA
@@ -91,7 +93,7 @@ nfaToDFASt nfa = do
     let ks = S.toList . S.fromList $ concatMap NE.toList $ M.keys xs
         xs' = M.fromListWith (<>) [(k, v) | (k1, v) <- M.toList xs, k <- NE.toList k1]
         es = M.fromListWith (<>)
-              [ (k1, [k2]) | k1 <- ks, k2 <- ks, k1 /= k2, contains k2 k1 ]
+              [ (k1, [k2]) | k1 <- ks, k2 <- ks, k1 /= k2, containsCR k2 k1 ]
         getRow k = (S.singleton k, IS.unions $ map (xs' M.!) $ dfs es S.empty [k])
         mergeKeys = swapMap . swapMap
         swapMap :: (Ord k, Ord v, Semigroup k) => M.Map k v -> M.Map v k
@@ -106,16 +108,21 @@ nfaToDFASt nfa = do
     | otherwise = dfs g (S.insert x vis) $ case g M.!? x of
         Just xs' -> xs' ++ xs
         Nothing  -> xs
-  -- this function is asymmetric because we want to
-  -- prefer more concrete definitions to less concrete,
-  -- i.e. prefer char to range, etc.
-  contains CAny _ = True
-  contains _ CAny = False -- nothing contains any
-  contains CChar{} CRange{} = False -- char doesn't contain range
-  contains (CChar c1) (CChar c2) = c1 == c2 -- technically never happens,
-    -- but for the sake of correctness
-  contains (CRange a b) (CChar c1) = c1 >= a && c1 <= b
-  contains (CRange a b) (CRange c d) = a <= c && b >= d
+-- this function is asymmetric because we want to
+-- prefer more concrete definitions to less concrete,
+-- i.e. prefer char to range, etc.
+containsCR :: CharPattern -> CharPattern -> Bool
+containsCR CAny _ = True
+containsCR _ CAny = False -- nothing contains any
+containsCR (CNot (CNot a)) b = containsCR a b
+containsCR a (CNot (CNot b)) = containsCR a b
+containsCR (CNot a) (CNot b) = containsCR b a
+containsCR (CNot a) b = not $ containsCR a b
+containsCR _a (CNot _b) = False
+containsCR CChar{} CRange{} = False -- char doesn't contain range
+containsCR (CChar c1) (CChar c2) = c1 == c2
+containsCR (CRange a b) (CChar c1) = c1 >= a && c1 <= b
+containsCR (CRange a b) (CRange c d) = a <= c && b >= d
 
 ecls :: Ord a =>
           IM.IntMap (StateAttr, M.Map (Maybe a) [IS.Key])

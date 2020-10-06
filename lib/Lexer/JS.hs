@@ -109,3 +109,4 @@ module.exports = {TokenType, tokToStr, Lexer}
     charCond1 (CChar c) = [interp|curCh === #{tshow c}|]
     charCond1 (CRange c1 c2) = [interp|(curCh >= #{tshow c1} && curCh <= #{tshow c2})|]
     charCond1 CAny = "true"
+    charCond1 (CNot c) = "!(" <> charCond1 c <> ")"

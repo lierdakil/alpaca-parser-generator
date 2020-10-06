@@ -85,3 +85,4 @@ class Lexer:
     charCond1 (CChar c) = "curCh == " <> tshow c
     charCond1 (CRange c1 c2) = "(curCh >= " <> tshow c1 <> " and curCh <= " <> tshow c2 <> ")"
     charCond1 CAny = "True"
+    charCond1 (CNot c) = "not (" <> charCond1 c <> ")"

@@ -63,13 +63,7 @@ sortCharPatterns = sortBy (cmp `on` fst)
             | otherwise = EQ
       where ainb = contains' b a
             bina = contains' a b
-    contains' a b = all (\bi -> any (`contains` bi) (NE.toList a)) (NE.toList b)
-    contains CAny _ = True
-    contains _ CAny = False -- nothing contains any
-    contains CChar{} CRange{} = False -- char doesn't contain range
-    contains (CChar c1) (CChar c2) = c1 == c2
-    contains (CRange a b) (CChar c1) = c1 >= a && c1 <= b
-    contains (CRange a b) (CRange c d) = a <= c && b >= d
+    contains' a b = all (\bi -> any (`containsCR` bi) (NE.toList a)) (NE.toList b)
 
 newState :: State Int Int
 newState = state $ \s -> (s+1, s+1)

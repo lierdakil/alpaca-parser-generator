@@ -12,6 +12,7 @@ import qualified Data.Text as T
 %error { parseError }
 %token
   '['  { TLBrace }
+  '[^' { TLNegBrace }
   ']'  { TRBrace }
   '('  { TLParen }
   ')'  { TRParen }
@@ -48,12 +49,13 @@ ExpSeq
   |                { [] }
 
 Single
-  : '[' Grp ']' { (PGroup $2:) }
-  | Char        { (PGroup (pure $1):) }
-  | Single '*'  { (PKleene ($1 []):) }
-  | Single '+'  { (PPositive ($1 []):) }
-  | Single '?'  { (PMaybe ($1 []):) }
-  | '(' Exp ')' { ($2 <>) }
+  : '[' Grp ']'  { (PGroup $2:) }
+  | '[^' Grp ']' { (PGroup (fmap CNot $2):) }
+  | Char         { (PGroup (pure $1):) }
+  | Single '*'   { (PKleene ($1 []):) }
+  | Single '+'   { (PPositive ($1 []):) }
+  | Single '?'   { (PMaybe ($1 []):) }
+  | '(' Exp ')'  { ($2 <>) }
 
 Char
   : '.' { CAny }
@@ -83,6 +85,7 @@ data CharPattern =
     CChar Char
   | CRange Char Char
   | CAny
+  | CNot CharPattern
   deriving (Show, Eq, Ord)
 
 data RegexPatternSingle =
