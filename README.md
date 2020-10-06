@@ -56,6 +56,8 @@ or
 
 The first form contains token name, which can be referenced in grammar, and token pattern defined by a regular expression (between slashes), and token semantic value, which is an expression in the target language (optional).
 
+If the first character of `<regex>` is `?`, then the pattern is interpreted as non-greedy, consequently lexer will return the _shortest_ match instead of the longest one (which is the default).
+
 Token names _must_ begin with a lowercase ASCII letter or the underscore character `_`, and contain only ASCII letters, digits and the underscore character.
 
 Semantic value can reference variable `text`, which contains the string matched by token pattern. If target language is C++, then semantic value must be an `std::string` (which `text` is). In other target languages, it can be any type.
