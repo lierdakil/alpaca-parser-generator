@@ -35,11 +35,12 @@ runProgram lang parserMethod debugLexer parserName baseFileName inputFile = do
   setCurrentDirectory rootdir
   runInIO $ do
     writeFiles =<< makeLexer lang debugLexer lexic
-    wrap parserName $ makeParser lang parserMethod ParserOptions{
-        parserOptionsName = parserName
-      , parserOptionsBaseFileName = baseFileName
-      , parserOptionsGrammarDefinition = grammar
-    }
+    unless (T.null grammar) $ 
+      wrap parserName $ makeParser lang parserMethod ParserOptions{
+          parserOptionsName = parserName
+        , parserOptionsBaseFileName = baseFileName
+        , parserOptionsGrammarDefinition = grammar
+      }
 
 enumReader :: [([String], a)] -> ReadM a
 enumReader tbl = eitherReader go
