@@ -46,6 +46,9 @@ class Lexer {
         lastAccChIx = this.curChIx
         accSt = curSt
       }
+      if ([#{T.intercalate "," nonGreedyStates}].includes(curSt)) {
+        break
+      }
       if (this.curChIx >= this.input.length) break
       curCh = this.input[this.curChIx]
       this.curChIx+=1
@@ -73,14 +76,17 @@ module.exports = {TokenType, tokToStr, Lexer}
 |])]
     where
     indent = indentLang 2
+    nonGreedyStates = map (tshow . fst) $ filter (nonGreedy . snd) accSt
+      where nonGreedy StateData{saGreed=NonGreedy} = True
+            nonGreedy _ = False
     returnResult = T.intercalate "\n" (map returnResult1 accSt)
-    returnResult1 :: (Int, (Maybe Text, Action)) -> Text
-    returnResult1 (st, (Just name, act)) = [interp|
+    returnResult1 :: (Int, StateData) -> Text
+    returnResult1 (st, StateData{saName=Just name, saAct=act}) = [interp|
       case #{st}:
         if (this.debug) console.log("Lexed token #{name}: \\"" + text + "\\"")
         return [TokenType.Tok_#{name}, #{mkAct act}]
       |]
-    returnResult1 (st, (Nothing, _)) = [interp|
+    returnResult1 (st, StateData{saName=Nothing}) = [interp|
       case #{st}:
         if (this.debug) console.log("Skipping state #{tshow st}: \\"" + text + "\\"")
         return this.getNextToken()

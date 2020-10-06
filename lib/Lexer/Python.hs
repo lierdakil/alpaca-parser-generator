@@ -35,6 +35,8 @@ class Lexer:
             if curSt in [#{T.intercalate "," $ map (tshow . fst) accSt}]:
                 lastAccChIx = self.curChIx
                 accSt = curSt
+            if curSt in [#{T.intercalate "," nonGreedyStates}]:
+                break
             if self.curChIx >= len(self.input): break
             curCh = self.input[self.curChIx]
             self.curChIx+=1
@@ -52,14 +54,17 @@ class Lexer:
 |])]
     where
     indent = indentLang 4
+    nonGreedyStates = map (tshow . fst) $ filter (nonGreedy . snd) accSt
+      where nonGreedy StateData{saGreed=NonGreedy} = True
+            nonGreedy _ = False
     returnResult = T.intercalate "\nel" (map returnResult1 accSt)
-    returnResult1 :: (Int, (Maybe Text, Action)) -> Text
-    returnResult1 (st, (Just name, act)) = [interp|
+    returnResult1 :: (Int, StateData) -> Text
+    returnResult1 (st, StateData{saName=Just name, saAct=act}) = [interp|
       if accSt == #{tshow st}:
           if self.debug: print("Lexed token #{name}: \\"" + text + "\\"")
           return (TokenType.Tok_#{name}, #{mkAct act})
       |]
-    returnResult1 (st, (Nothing, _)) = [interp|
+    returnResult1 (st, StateData{saName=Nothing}) = [interp|
       if accSt == #{tshow st}:
           if self.debug: print("Skipping state #{tshow st}: \\"" + text + "\\"")
           return self.getNextToken()

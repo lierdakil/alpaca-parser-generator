@@ -30,7 +30,8 @@ import qualified Data.Text as T
 %%
 
 Def
-  : MbName Exp MbAct eof { RegexDef $1 $2 $3 }
+  : MbName Exp MbAct eof     { RegexDef $1 Greedy $2 $3 }
+  | MbName '?' Exp MbAct eof { RegexDef $1 NonGreedy $3 $4 }
 
 MbName
   : name { Just $1 }
@@ -76,8 +77,10 @@ GrpCont
   |              { [] }
 
 {
-data RegexDef = RegexDef (Maybe Text) RegexPattern Action
+data RegexDef = RegexDef (Maybe Text) Greediness RegexPattern Action
   deriving Show
+
+data Greediness = Greedy | NonGreedy deriving (Show, Eq, Ord)
 
 data Action = NoAction | Action Text deriving (Show, Eq, Ord)
 

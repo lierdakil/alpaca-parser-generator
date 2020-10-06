@@ -2,7 +2,7 @@
 {-# LANGUAGE QuasiQuotes, OverloadedStrings, FlexibleContexts #-}
 module Lexer.CSharp() where
 
-import qualified Data.IntSet as IS
+import qualified Data.IntMap as IM
 import qualified Data.List.NonEmpty as NE
 import Regex.Parse
 import Data.Text (Text)
@@ -54,10 +54,13 @@ public class Lexer {
 |])]
     where
     indent = indentLang 2
-    accStS = IS.fromList $ map fst accSt
+    accStS = IM.fromList accSt
     checkAccepting st
-      | st `IS.member` accStS
-      = "lastAccChIx = curChIx; accSt = "<>tshow st <>";"
+      | Just StateData{saGreed=greed} <- st `IM.lookup` accStS = [interp|
+        lastAccChIx = curChIx;
+        accSt = #{st};
+        #{if greed == NonGreedy then "goto end;" else "" :: T.Text}
+        |]
       | otherwise = ""
     returnResult = T.intercalate "\n" (map returnResult1 accSt)
     checkState (curSt, (_, charTrans)) = [interp|
@@ -70,12 +73,12 @@ public class Lexer {
         goto end;
       |] :: Text
     transTable = T.intercalate "\n" $ map checkState stList
-    returnResult1 (st, (Just name, act)) = [interp|
+    returnResult1 (st, StateData{saName=Just name, saAct=act}) = [interp|
       case #{st}:
         if (debug) Console.Error.WriteLine($"Lexed token #{name}: \\"{text}\\"");
         return (TokenType.Tok_#{name}, #{mkAct act});
       |] :: Text
-    returnResult1 (st, (Nothing, _)) = [interp|
+    returnResult1 (st, StateData{saName=Nothing}) = [interp|
       case #{st}:
         if (debug) Console.Error.WriteLine($"Skipping state #{st}: \\"{text}\\"");
         goto start;

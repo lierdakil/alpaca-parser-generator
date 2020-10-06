@@ -39,9 +39,8 @@ makeLexer lang outputDebug input = do
   accSt <- catMaybes <$> mapM (\(f, (s, _)) -> fmap (f,) <$> isSingle f s) stList
   let tokNames = nub $ mapMaybe (saName . snd) accSt
       terminals = TermEof : map Term tokNames
-      accSt' = map (second (\x -> (saName x, saAct x))) accSt
   put terminals
-  return . debug $ writeLexer lang accSt' tokNames stList
+  return . debug $ writeLexer lang accSt tokNames stList
   where
     isSingle f xs
       | S.null xs = return Nothing
@@ -119,14 +118,14 @@ regexToNFASt = foldr
   (\p -> (IM.unionWith mapUnion <$> regex1ToNFASt p <*>))
   (return IM.empty)
 
-regexToNFA :: (Int, Maybe Text, Action) -> RegexPattern -> State Int NFA
-regexToNFA (num, name, action) pat = do
+regexToNFA :: (Int, Maybe Text, Action, Greediness) -> RegexPattern -> State Int NFA
+regexToNFA (num, name, action, greed) pat = do
   res1 <- regexToNFASt pat
   lastSt <- get
-  return $ IM.insertWith mapUnion lastSt (S.singleton (StateData num name action), M.empty) res1
+  return $ IM.insertWith mapUnion lastSt (S.singleton (StateData num name action greed), M.empty) res1
 
 build1NFA :: Int -> RegexDef -> State Int NFA
-build1NFA num (RegexDef mbname pat mbact) = regexToNFA (num, mbname, mbact) pat
+build1NFA num (RegexDef mbname greed pat mbact) = regexToNFA (num, mbname, mbact, greed) pat
 -- build1DFA = fmap (simplifyDFA . nfaToDFA . regexToNFA . regex) . scan
 
 buildNFA :: [RegexDef] -> State Int NFA

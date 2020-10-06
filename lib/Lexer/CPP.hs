@@ -2,7 +2,7 @@
 {-# LANGUAGE QuasiQuotes, OverloadedStrings, FlexibleContexts #-}
 module Lexer.CPP() where
 
-import qualified Data.IntSet as IS
+import qualified Data.IntMap as IM
 import qualified Data.List.NonEmpty as NE
 import Regex.Parse
 import qualified Data.Text as T
@@ -68,11 +68,12 @@ Token Lexer::getNextToken() {
 |])]
     where
     indent = indentLang 2
-    accStS = IS.fromList $ map fst accSt
+    accStS = IM.fromList accSt
     checkAccepting st
-      | st `IS.member` accStS = [interp|
+      | Just StateData{saGreed=greed} <- st `IM.lookup` accStS = [interp|
         lastAccChIx = curChIx;
         accSt = #{st};
+        #{if greed == NonGreedy then "goto end;" else "" :: T.Text}
         |]
       | otherwise = ""
     returnResult = T.intercalate "\n" (map returnResult1 accSt)
@@ -87,12 +88,12 @@ Token Lexer::getNextToken() {
         goto end;
       |]
     transTable = T.intercalate "\n" $ map checkState stList
-    returnResult1 (st, (Just name, act)) = [interp|
+    returnResult1 (st, StateData{saName=Just name, saAct=act}) = [interp|
       case #{st}:
         if (debug) std::cerr << "Lexed token #{name}: \\"" << text << "\\"" << std::endl;
         return {TokenType::Tok_#{name}#{mkAct act}};
       |]
-    returnResult1 (st, (Nothing, _)) = [interp|
+    returnResult1 (st, StateData{saName=Nothing}) = [interp|
       case #{st}:
         if (debug) std::cerr << "Skipping state #{st}: \\"" << text << "\\"" << std::endl;
         goto start;
