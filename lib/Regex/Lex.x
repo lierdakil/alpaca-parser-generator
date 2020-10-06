@@ -2,6 +2,7 @@
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 module Regex.Lex where
 import Data.Text (Text)
+import Data.Char (chr)
 import qualified Data.Text as T
 }
 
@@ -22,6 +23,10 @@ tokens :-
 <regex>  \?  { mkTok $ const TQuest }
 <regex>  \-  { mkTok $ const TDash }
 <regex>  \|  { mkTok $ const TAlt }
+<regex>  \\r { mkTok $ \s -> TChar $ chr 13 }
+<regex>  \\n { mkTok $ \s -> TChar $ chr 10 }
+<regex>  \\t { mkTok $ \s -> TChar $ chr 9  }
+<regex>  \\0x[a-fA-F0-9]+ { mkTok $ \s -> TChar . chr . read . T.unpack $ T.drop 1 s }
 <regex>  \\. { mkTok $ \s -> TChar $ T.index s 1 }
 <regex>  \/$white*  { begin action }
 <regex>  .   { mkTok $ \s -> TChar $ T.head s }

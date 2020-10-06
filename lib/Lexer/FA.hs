@@ -52,9 +52,11 @@ dfaToGraphviz fa = "digraph{rankdir=LR;" <> foldMap node l <> "}"
 showCharPattern :: Maybe (NonEmpty CharPattern) -> Text
 showCharPattern Nothing = "ε"
 showCharPattern (Just (x :| rest)) = foldMap show1 $ x : rest
-  where show1 (CChar c) = T.pack ['\'', c, '\'']
-        show1 (CRange a b) = T.pack ['[',a,'-',b,']']
-        show1 CAny = "'.'"
+  where show1 (CChar '"') = T.pack "\'\\\"\'"
+        show1 (CChar c) = tshow' c
+        show1 (CRange a b) = "[" <> tshow' a <> "-" <> tshow' b <> "]"
+        show1 CAny = "."
+        tshow' = T.replace "\\" "\\\\" . tshow
 
 nfaToDFASt :: NFA -> State (Int, IS.IntSet, [(Int, (StateAttr, IS.IntSet))]) DFA
 nfaToDFASt nfa = do
