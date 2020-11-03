@@ -49,15 +49,15 @@ buildLLParser ParserOptions{..} = do
   getRuleType Rule{ruleName=h,ruleType=t'} = (NonTerm h, t')
   rules = parserOptionsGrammarDefinition
   writeCell nonterm term
-    | Just (act, b:rest) <- M.lookup (NonTerm nonterm, term) tt
+    | Just ((act, b):rest) <- M.lookup (NonTerm nonterm, term) tt
     = do
         unless (null rest) $
-          tell [[interp|LL parser has multiple rules in the same cell: #{tshow (b:rest)}|],
+          tell [[interp|LL parser has multiple rules in the same cell: #{tshow (b:map snd rest)}|],
                 [interp|Choosing #{tshow b}|]]
         return $ Just ((term, NonTerm nonterm), (b, act))
     | otherwise = return Nothing
-  tt = M.fromListWith (liftM2 (++)) . foldMap r2t $ M.toList t
-  r2t ((nt, b), (ts, act)) = map (\term -> ((nt, term), (act, [b]))) $ S.toList ts
+  tt = M.fromListWith (++) . foldMap r2t $ M.toList t
+  r2t ((nt, b), (ts, act)) = map (\term -> ((nt, term), [(act, b)])) $ S.toList ts
   startSymbol = let (Rule{ruleName=h} :| _) = rules in NonTerm h
   r = mkRulesMap rules
   t = buildTable r
@@ -82,7 +82,7 @@ printTable t = T.pack $ tableString (repeat def) unicodeS (titlesH $ map T.unpac
   showBody' x = T.unpack $ showBody x
 
 buildTable :: RulesMap -> Table
-buildTable r = M.fromListWith (<>) $ foldMap (uncurry oneRule) rules
+buildTable r = M.fromList $ foldMap (uncurry oneRule) rules
   where
   rules = M.toList r
   oneRule h = map (oneAlt h) . NE.toList
