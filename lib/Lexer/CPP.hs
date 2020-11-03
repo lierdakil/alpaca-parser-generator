@@ -103,7 +103,7 @@ Token Lexer::getNextToken() {
     tokTypeMap = M.fromList tokNames
     mkAct _ NoAction = ", std::any()"
     mkAct tn (Action act) = case M.lookup tn tokTypeMap of
-      Just (Type t) -> [interp|,static_cast<#{t}>(#{act})|]
+      Just (Type t) -> [interp|,static_cast<#{t}&&>(#{act})|]
       _ -> "," <> act
     checkChars (charGroup, newSt) = "if(" <> charCond charGroup <> ") goto state_" <> tshow newSt <> ";"
     charCond = T.intercalate "||" . map charCond1 . NE.toList

@@ -149,11 +149,11 @@ std::any #{name}::parse() {
           = "std::any()"
         cast :: Text -> Text
         cast y = case M.lookup (NonTerm h) lrTypes of
-          Just (Type t) -> [interp|static_cast<#{t}>(#{y})|]
+          Just (Type t) -> [interp|static_cast<#{t}&&>(#{y})|]
           _ -> y
         showArg x i = case M.lookup x lrTypes of
           Just (Type t) ->
-            [interp|auto _#{i} = std::any_cast<#{t}>(std::move(stack.top().second)); stack.pop();|]
+            [interp|auto _#{i} = std::any_cast<#{t}&&>(std::move(stack.top().second)); stack.pop();|]
           _ ->
             [interp|auto _#{i} = std::move(stack.top().second); stack.pop();|]
     nonTermIdx nt = fromJust $ M.lookup nt nonTerminalsMap

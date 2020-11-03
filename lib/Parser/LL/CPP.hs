@@ -132,13 +132,13 @@ std::any #{className}::parse() {
         act :: Text
         act | Just code <- mcode
             = case M.lookup h llTypes of
-                Just (Type t) -> [interp|static_cast<#{t}>(#{code})|]
+                Just (Type t) -> [interp|static_cast<#{t}&&>(#{code})|]
                 _ -> [interp|(#{code})|]
             | otherwise
             = "std::any()"
         showArg x i =
           case M.lookup x llTypes of
-            Just (Type t) -> [interp|auto _#{tshow i}=std::any_cast<#{t}>(std::move(resultStack.top()));|]
+            Just (Type t) -> [interp|auto _#{tshow i}=std::any_cast<#{t}&&>(std::move(resultStack.top()));|]
             _ -> [interp|auto _#{tshow i}=std::move(resultStack.top());|]
           <> "resultStack.pop();"
 

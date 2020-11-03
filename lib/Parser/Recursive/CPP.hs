@@ -127,5 +127,5 @@ public:
         |]
       where cast :: Text -> Text
             cast y = case M.lookup x recTypes of
-              Just (Type t) -> [interp|std::any_cast<#{t}>(#{y})|]
+              Just (Type t) -> [interp|std::any_cast<#{t}&&>(#{y})|]
               _ -> y
