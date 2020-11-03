@@ -81,8 +81,12 @@ Parameters
   ;
 
 Parameters1
-  : Parameter               { [_1] }
-  | Parameter c Parameters1 { [_1] + _3 }
+  : Parameter Parameters1Rest  { [_1, *_2] }
+  ;
+
+Parameters1Rest
+  : c Parameters1 { _2 }
+  | { [] }
   ;
 
 Parameter
@@ -90,8 +94,12 @@ Parameter
   ;
 
 Identifiers
-  : Identifier               { [_1] }
-  | Identifier c Identifiers { [_1] + _3 }
+  : Identifier IdentifiersRest { [_1, *_2] }
+  ;
+
+IdentifiersRest
+  : c Identifiers { _2 }
+  | { [] }
   ;
 
 ReturnType
@@ -127,31 +135,46 @@ Statement
   | while lp Expr rp lb Statements rb { WhileStmt(_3, _6) }
   | do Call sc { DoStmt(_2) }
   | let ArrayExpr equals Expr sc { LetStmt(_2, _4) }
-  | return Expr sc { ReturnStmt(_2) }
-  | return sc { ReturnStmt() }
+  | return ExprOrNothing sc { ReturnStmt(_2) }
+  ;
+
+ExprOrNothing
+  : Expr { _1 }
+  | { None }
   ;
 
 ArrayExpr
-  : Identifier { _1 }
-  | Identifier lbr Expr rbr  { ArrayExpr(_1, _3) }
+  : Identifier Arr { _2(_1) }
+  ;
+
+Arr
+  : lbr Expr rbr  { lambda x,_2=_2: ArrayExpr(x, _2) }
+  | MethodRest lp Arguments rp { lambda x,_1=_1,_3=_3: Call([x, *_1], _3) }
+  | { lambda x: x }
   ;
 
 Identifier
   : identifier { Identifier(_1) }
   ;
 
-Expr
+Expr : Expr1 Expr2 { _2(_1) }
+     ;
+
+Expr1
   : primVal    { Term(PrimVal(_1)) }
   | ArrayExpr  { Term(_1) }
-  | Call       { Term(_1) }
-  | %left1 Expr binOp Expr  { BinOp(_2, _1, _3) }
-  | %left1 Expr equals Expr { BinOp('=', _1, _3) }
-  | %left1 Expr minus Expr { BinOp('-', _1, _3) }
-  | %left5 not Expr   { Not(_2) }
-  | %left5 minus Expr { Neg(_2) }
+  | %left5 not Expr1   { Not(_2) }
+  | %left5 minus Expr1 { Neg(_2) }
   | lp Expr rp { Parens(_2) }
   | integerConstant { Term(IntConst(_1)) }
   | stringConstant  { Term(StrConst(_1)) }
+  ;
+
+Expr2
+  :             { lambda x: x }
+  | binOp Expr  { lambda x,_1=_1,_2=_2: BinOp(_1,  x, _2) }
+  | equals Expr { lambda x,_2=_2: BinOp('=', x, _2) }
+  | minus Expr  { lambda x,_2=_2: BinOp('-', x, _2) }
   ;
 
 Call
@@ -159,8 +182,12 @@ Call
   ;
 
 MethodChain
-  : Identifier                 { [_1] }
-  | Identifier dot MethodChain { [_1] + _3 }
+  : Identifier MethodRest                { [_1, *_2] }
+  ;
+
+MethodRest
+  : dot MethodChain { _2 }
+  | { [] }
   ;
 
 Arguments
@@ -169,8 +196,12 @@ Arguments
   ;
 
 Arguments1
-  : Expr              { [_1] }
-  | Expr c Arguments1 { [_1] + _3 }
+  : Expr ArgumentsRest { [_1, *_2] }
+  ;
+
+ArgumentsRest
+  : c Arguments1 { _2 }
+  | { [] }
   ;
 
 ElseBlock
