@@ -21,6 +21,7 @@ type Table = M.Map (Symbol, [Symbol]) (S.Set Symbol, Maybe Text)
 data LLParser = LLParser {
     llStartSymbol :: Symbol
   , llTerminals :: [Symbol]
+  , llTypes :: M.Map Symbol Type
   , llNonTerminals :: [Symbol]
   , llActions :: M.Map (Symbol,Symbol) ([Symbol], Maybe Text)
   }
@@ -31,7 +32,8 @@ instance Parser LLParser where
 
 buildLLParser :: Monad m => ParserOptions Rules -> MyMonadT m ([(FilePath, Text)],LLParser)
 buildLLParser ParserOptions{..} = do
-  tokens <- get
+  tokensAndTypes <- get
+  let tokens = map fst tokensAndTypes
   lr <- isLeftRecursive r
   when lr $ throwError ["LL(1) parser can not handle left-recursive grammar"]
   cells <- M.fromList . concat <$> mapM (fmap catMaybes . forM tokens . writeCell) nonTerms
@@ -39,10 +41,12 @@ buildLLParser ParserOptions{..} = do
   return (debug, LLParser{
       llStartSymbol = startSymbol
     , llTerminals = tokens
+    , llTypes = M.fromList $ tokensAndTypes <> map getRuleType (NE.toList parserOptionsGrammarDefinition)
     , llNonTerminals = map NonTerm nonTerms
     , llActions = cells
     })
   where
+  getRuleType Rule{ruleName=h,ruleType=t'} = (NonTerm h, t')
   rules = parserOptionsGrammarDefinition
   writeCell nonterm term
     | Just (act, b:rest) <- M.lookup (NonTerm nonterm, term) tt
@@ -54,7 +58,7 @@ buildLLParser ParserOptions{..} = do
     | otherwise = return Nothing
   tt = M.fromListWith (liftM2 (++)) . foldMap r2t $ M.toList t
   r2t ((nt, b), (ts, act)) = map (\term -> ((nt, term), (act, [b]))) $ S.toList ts
-  startSymbol = let (Rule h _ :| _) = rules in NonTerm h
+  startSymbol = let (Rule{ruleName=h} :| _) = rules in NonTerm h
   r = mkRulesMap rules
   t = buildTable r
   nonTerms = M.keys r

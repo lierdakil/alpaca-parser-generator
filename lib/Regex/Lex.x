@@ -12,6 +12,8 @@ tokens :-
 <0> $white+              ;
 <0> \/                   { begin regex  }
 <0> [a-z_][a-zA-Z_0-9]*  { mkTok TName  }
+<0> \{                   { begin action }
+<0> \:\:                 { begin type1 }
 
 <regex>  \[\^  { mkTok $ const TLNegBrace }
 <regex>  \[  { mkTok $ const TLBrace }
@@ -29,10 +31,11 @@ tokens :-
 <regex>  \\t { mkTok $ const $ TChar $ chr 9  }
 <regex>  \\0x[a-fA-F0-9]+ { mkTok $ \s -> TChar . chr . read . T.unpack $ T.drop 1 s }
 <regex>  \\. { mkTok $ \s -> TChar $ T.index s 1 }
-<regex>  \/$white*  { begin action }
+<regex>  \/$white*  { begin 0 }
 <regex>  .   { mkTok $ \s -> TChar $ T.head s }
 
-<action> .+        { mkTok TAction }
+<action> .+\}    { mkTok (TAction . T.init) `andBegin` 0 }
+<type1>  .+      { mkTok $ TType . T.strip }
 
 {
 data Token =
@@ -51,6 +54,7 @@ data Token =
   | TEOF
   | TName Text
   | TAction Text
+  | TType Text
   deriving (Eq, Show)
 
 alexEOF = return TEOF

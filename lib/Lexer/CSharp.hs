@@ -18,7 +18,7 @@ using System;
 
 namespace lexer {
 public enum TokenType : uint {
-  eof, #{T.intercalate "," (map ("Tok_"<>) tokNames)}
+  eof, #{T.intercalate "," (map (("Tok_"<>) . fst) tokNames)}
 }
 public class Lexer {
   private readonly string input;

@@ -37,8 +37,8 @@ makeLexer lang outputDebug input = do
       stList = map (second (second (sortCharPatterns . M.toList))) $ IM.toList dfa
 
   accSt <- catMaybes <$> mapM (\(f, (s, _)) -> fmap (f,) <$> isSingle f s) stList
-  let tokNames = nub $ mapMaybe (saName . snd) accSt
-      terminals = TermEof : map Term tokNames
+  let tokNames = nub $ mapMaybe (\(_, x) -> (, saType x) <$> saName x) accSt
+      terminals = (TermEof, NoType) : map (first Term) tokNames
   put terminals
   return . debug $ writeLexer lang accSt tokNames stList
   where
@@ -118,14 +118,15 @@ regexToNFASt = foldr
   (\p -> (IM.unionWith mapUnion <$> regex1ToNFASt p <*>))
   (return IM.empty)
 
-regexToNFA :: (Int, Maybe Text, Action, Greediness) -> RegexPattern -> State Int NFA
-regexToNFA (num, name, action, greed) pat = do
+regexToNFA :: (Int, Maybe Text, Action, Type, Greediness) -> RegexPattern -> State Int NFA
+regexToNFA (num, name, action, typ, greed) pat = do
   res1 <- regexToNFASt pat
   lastSt <- get
-  return $ IM.insertWith mapUnion lastSt (S.singleton (StateData num name action greed), M.empty) res1
+  return $ IM.insertWith mapUnion lastSt (S.singleton (StateData num name action typ greed), M.empty) res1
 
 build1NFA :: Int -> RegexDef -> State Int NFA
-build1NFA num (RegexDef mbname greed pat mbact) = regexToNFA (num, mbname, mbact, greed) pat
+build1NFA num (RegexDef mbname greed pat mbact mbtyp)
+  = regexToNFA (num, mbname, mbact, mbtyp, greed) pat
 -- build1DFA = fmap (simplifyDFA . nfaToDFA . regexToNFA . regex) . scan
 
 buildNFA :: [RegexDef] -> State Int NFA

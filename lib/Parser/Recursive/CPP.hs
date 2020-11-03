@@ -16,6 +16,7 @@ import Utils
 import Parser.Types
 import Data.Char
 import qualified Data.Set as S
+import qualified Data.Map as M
 import Data.List
 import qualified Control.Arrow as A
 import Parser.Recursive.Build
@@ -35,7 +36,7 @@ class #{parserOptionsName}#{topInh gtop} {
   #{indent 1 $ T.intercalate "\n" $ map fst parsers}
 public:
   #{parserOptionsName}(Lexer *lex, bool debug = false);
-  #{returnType startRuleDoesReturn} parse();
+  #{startRuleType} parse();
 };
 #endif
 |]) ,(basename <> ".cpp", [interp|
@@ -45,7 +46,7 @@ public:
 #{parserOptionsName}::#{parserOptionsName}(Lexer *lex, bool debug):lex(lex),debug(debug){
   curTok = lex->getNextToken();
 }
-#{returnType startRuleDoesReturn} Parser::parse() { return parse_#{recursiveParserStartRule}(); }
+#{startRuleType} Parser::parse() { return parse_#{recursiveParserStartRule}(); }
 #{T.intercalate "\n" $ map snd parsers}
 |])]
     where
@@ -56,18 +57,22 @@ public:
     parsers :: [(Text, Text)]
     parsers = map makeOneParser $ NE.toList recursiveParserParsers
 
+    startRuleType = returnType (NonTerm recursiveParserStartRule) startRuleDoesReturn
+
     makeOneParser :: RecursiveParserItem -> (Text, Text)
     makeOneParser RecursiveParserItem{..} = ([interp|
-      #{returnType recursiveParserItemDoesReturn} parse_#{recursiveParserItemHead}();
+      #{returnType (NonTerm recursiveParserItemHead) recursiveParserItemDoesReturn} parse_#{recursiveParserItemHead}();
       |], [interp|
-      #{returnType recursiveParserItemDoesReturn} #{parserOptionsName}::parse_#{recursiveParserItemHead}() {
+      #{returnType (NonTerm recursiveParserItemHead) recursiveParserItemDoesReturn} #{parserOptionsName}::parse_#{recursiveParserItemHead}() {
         #{indent 1 $ makeAlternatives recursiveParserItemHead recursiveParserItemAlternatives }
       }
       |])
 
-    returnType :: RecursiveParserItemDoesReturn -> Text
-    returnType DoesReturnValue = "ResultType"
-    returnType DoesNotReturnValue = "void"
+    returnType :: Symbol -> RecursiveParserItemDoesReturn -> Text
+    returnType _ DoesNotReturnValue = "void"
+    returnType x DoesReturnValue = case M.lookup x recTypes of
+      Just (Type t) -> t
+      _ -> "std::any"
 
     makeAlternatives :: Text -> RecursiveParserItemAlternatives -> Text
     makeAlternatives _ (SingleBody b act) = makeBody b act
@@ -111,14 +116,16 @@ public:
     tok _ = error "Not a token"
 
     makeBodySym :: Word -> (Symbol, RecursiveParserItemDoesReturn) -> Text
-    makeBodySym n s = case s of
-      (NonTerm nt, DoesReturnValue)
-        -> [interp|auto _#{n} = parse_#{nt}();|]
-      (NonTerm nt, DoesNotReturnValue)
-        -> [interp|parse_#{nt}();|]
+    makeBodySym n s@(x,_) = case s of
+      (NonTerm nt, DoesReturnValue) -> [interp|auto _#{n} = parse_#{nt}();|]
+      (NonTerm nt, DoesNotReturnValue) -> [interp|parse_#{nt}();|]
       (s', _) -> [interp|
         if(curTok.first != TokenType::#{tok s'})
           throw std::runtime_error("Expected token #{tok s'}, but got " + to_string(curTok.first));
-        auto _#{n} = std::move(curTok.second);
+        auto _#{n} = #{cast "std::move(curTok.second)"};
         curTok = lex->getNextToken();
         |]
+      where cast :: Text -> Text
+            cast y = case M.lookup x recTypes of
+              Just (Type t) -> [interp|std::any_cast<#{t}>(#{y})|]
+              _ -> y

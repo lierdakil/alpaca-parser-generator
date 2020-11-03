@@ -25,13 +25,14 @@ import qualified Data.Text as T
   c    { TChar $$ }
   name { TName $$ }
   act  { TAction $$ }
+  typ  { TType $$ }
   eof  { TEOF }
 
 %%
 
 Def
-  : MbName Exp MbAct eof     { RegexDef $1 Greedy $2 $3 }
-  | MbName '?' Exp MbAct eof { RegexDef $1 NonGreedy $3 $4 }
+  : MbName Exp MbAct MbType eof     { RegexDef $1 Greedy $2 $3 $4 }
+  | MbName '?' Exp MbAct MbType eof { RegexDef $1 NonGreedy $3 $4 $5 }
 
 MbName
   : name { Just $1 }
@@ -40,6 +41,10 @@ MbName
 MbAct
   : act { Action $1 }
   |     { NoAction }
+
+MbType
+  : typ { Type $1 }
+  |     { NoType }
 
 Exp
   : ExpSeq         { $1 }
@@ -77,12 +82,14 @@ GrpCont
   |              { [] }
 
 {
-data RegexDef = RegexDef (Maybe Text) Greediness RegexPattern Action
+data RegexDef = RegexDef (Maybe Text) Greediness RegexPattern Action Type
   deriving Show
 
 data Greediness = Greedy | NonGreedy deriving (Show, Eq, Ord)
 
 data Action = NoAction | Action Text deriving (Show, Eq, Ord)
+
+data Type = NoType | Type Text deriving (Show, Eq, Ord)
 
 data CharPattern =
     CChar Char

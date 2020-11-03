@@ -47,7 +47,7 @@ Grammar definition files are text files containing both lexical and grammatical 
 
 The file starts with lexical rules. Lexical rules can have two forms:
 ```
-<name> /<regex>/ [<semantic value>]
+<name> /<regex>/ [{<semantic value>}] [:: <type>]
 ```
 or
 ```
@@ -60,7 +60,9 @@ If the first character of `<regex>` is `?`, then the pattern is interpreted as n
 
 Token names _must_ begin with a lowercase ASCII letter or the underscore character `_`, and contain only ASCII letters, digits and the underscore character.
 
-Semantic value can reference variable `text`, which contains the string matched by token pattern. If target language is C++, then semantic value must be an `std::string` (which `text` is). In other target languages, it can be any type.
+Semantic value, which is enclosed in braces, is an expression in the target language. It can reference variable `text`, which contains the string matched by token pattern.
+
+Optionally, type of the semantic value can be specified after `::`, which is a type expression in the target language. Currently this is only used for C++, for other languages it is ignored.
 
 If semantic value isn't specified, then token value is either empty or nonexistent (i.e. empty string, `null`, `None`, etc)
 
@@ -101,3 +103,5 @@ Equivalently, `->` or `::=` can be used instead if `:`.
 `<bodyN>` is one of the alternative bodies for the production rules with the head `<head>`. It must consist of terminal and non-terminal names separated by white-space. Additionally, a special token `%eof` can be used to signify end of input. Alternatives are separated by the vertical line ("pipe") character `|`. With LR-based parsers, each body can have a defined priority and associativity by starting with a `%leftN`, `%rightN` or `%nonN` directive, where `N` is an integer, corresponding to left-associative, right-associative and non-associative. Higher `N` means higher priority.
 
 Optionally, each body can contain a semantic action, which defines the semantic value of the non-terminal a given body describes. While being optional, in the absolute majority of cases it should be defined, if the contents associated with the parsing sub-tree are needed at all (i.e. when it's a real parser, not a recognizer). Semantic actions are basically expressions in the target language, delimited by curly braces. Semantic actions can reference elements in the body by the way of variables `_1`, `_2`, etc. Such variables corresponding to terminals will contain the token semantic value (note those might generate a run-time exception if the token doesn't have a semantic value). Variables corresponding to non-terminals will contain the non-terminal semantic value, as defined by its actions.
+
+After all alternatives are defined, before the semicolon, rule definition may optionally include `:: {<type>}`, i.e. literal `::` followed by a braced type expression in the target language. Note that the whole non-terminal is thus typed, hence all semantic actions are expected to have the same type. This is currently only used when target language is C++ and is ignored for other target languages.

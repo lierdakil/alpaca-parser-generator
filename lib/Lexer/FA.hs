@@ -11,7 +11,7 @@ module Lexer.FA (
   , containsCR
   ) where
 
-import Regex.Parse (Action, CharPattern(..), Greediness(..))
+import Regex.Parse (Action, Type, CharPattern(..), Greediness(..))
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.IntMap as IM
@@ -27,7 +27,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Utils
 
-data StateData = StateData { saNum :: Int, saName :: Maybe Text, saAct :: Action, saGreed :: Greediness } deriving (Show, Eq, Ord)
+data StateData = StateData { saNum :: Int, saName :: Maybe Text, saAct :: Action, saType :: Type, saGreed :: Greediness } deriving (Show, Eq, Ord)
 type StateAttr = S.Set StateData
 type NFA = IM.IntMap (StateAttr, M.Map (Maybe (NonEmpty CharPattern)) [Int])
 type DFA = IM.IntMap (StateAttr, M.Map (NonEmpty CharPattern) Int)

@@ -11,8 +11,10 @@ import Grammar
 
 import Data.Maybe
 import qualified Data.Set as S
+import qualified Data.Map as M
 import MonadTypes
 import Control.Monad
+import Control.Monad.State (get)
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 import Data.Text (Text)
@@ -25,8 +27,9 @@ instance Parser RecursiveParser where
     when lr $ throwError ["Recursive parser can not handle left-recursive grammar"]
     (,) [] <$> buildRecursiveParser parserOptionsGrammarDefinition
 
-newtype RecursiveParser = RecursiveParser {
+data RecursiveParser = RecursiveParser {
     recursiveParserParsers :: NonEmpty RecursiveParserItem
+  , recTypes :: M.Map Symbol Type
   }
 
 data RecursiveParserItem = RecursiveParserItem{
@@ -45,19 +48,22 @@ type Lookahead = S.Set (Maybe Symbol)
 buildRecursiveParser :: Monad m => Rules -> MyMonadT m RecursiveParser
 buildRecursiveParser rules = do
   parsers <- mapM makeRuleParser rules
+  tokensAndTypes <- get
   return RecursiveParser{
       recursiveParserParsers = parsers
+    , recTypes = M.fromList $ tokensAndTypes <> map getRuleType (NE.toList rules)
     }
   where
+  getRuleType Rule{ruleName=h,ruleType=t} = (NonTerm h, t)
   r = mkRulesMap rules
   doesReturn x | x `S.member` actionableRules = DoesReturnValue
                | otherwise = DoesNotReturnValue
-  actionableRules = S.fromList $ map (\(Rule k _ ) -> k)
-                    $ filter (\(Rule _ as) -> all (isJust . bwaAction) as)
+  actionableRules = S.fromList $ map (\Rule{ruleName=k} -> k)
+                    $ filter (\Rule{ruleBodies=as} -> all (isJust . bwaAction) as)
                     $ NE.toList rules
 
   makeRuleParser :: Monad m => Rule -> MyMonadT m RecursiveParserItem
-  makeRuleParser (Rule nt a) =
+  makeRuleParser Rule{ruleName=nt,ruleBodies=a} =
     RecursiveParserItem nt (doesReturn nt) <$> buildAlternatives nt (NE.toList a)
 
   buildAlternatives :: Monad m => Text -> [Alt] -> MyMonadT m RecursiveParserItemAlternatives

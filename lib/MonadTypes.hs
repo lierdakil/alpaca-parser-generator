@@ -18,7 +18,7 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import Grammar.Parse
 
-type MyMonadT m a = StateT [Symbol] (ExceptT [Text] (WriterT [Text] m)) a
+type MyMonadT m a = StateT [(Symbol,Type)] (ExceptT [Text] (WriterT [Text] m)) a
 type MyMonad a = MyMonadT Identity a
 
 runInIO :: MyMonadT IO () -> IO ()

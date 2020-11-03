@@ -3,6 +3,7 @@
 module Lexer.CPP() where
 
 import qualified Data.IntMap as IM
+import qualified Data.Map as M
 import qualified Data.List.NonEmpty as NE
 import Regex.Parse
 import qualified Data.Text as T
@@ -18,11 +19,12 @@ instance LexerWriter CPP where
 #include <cstddef>
 #include <string>
 #include <utility>
+#include <any>
 enum class TokenType : std::size_t {
-  eof, #{T.intercalate "," (map ("Tok_"<>) tokNames)}
+  eof, #{T.intercalate "," (map (("Tok_"<>) . fst) tokNames)}
 };
 const std::string to_string(TokenType tt);
-using Token = std::pair<TokenType, std::string>;
+using Token = std::pair<TokenType, std::any>;
 class Lexer {
   const std::string _input;
   const std::string_view input;
@@ -77,7 +79,7 @@ Token Lexer::getNextToken() {
         |]
       | otherwise = ""
     returnResult = T.intercalate "\n" (map returnResult1 accSt)
-    tokReflect = T.intercalate "," . map (\x -> "\"" <> x <> "\"") $ "%eof":tokNames
+    tokReflect = T.intercalate "," . map (\x -> "\"" <> x <> "\"") $ "%eof": map fst tokNames
     checkState (curSt, (_, charTrans)) = [interp|
       state_#{curSt}:
         #{indent 1 $ checkAccepting curSt}
@@ -91,15 +93,18 @@ Token Lexer::getNextToken() {
     returnResult1 (st, StateData{saName=Just name, saAct=act}) = [interp|
       case #{st}:
         if (debug) std::cerr << "Lexed token #{name}: \\"" << text << "\\"" << std::endl;
-        return {TokenType::Tok_#{name}#{mkAct act}};
+        return {TokenType::Tok_#{name}#{mkAct name act}};
       |]
     returnResult1 (st, StateData{saName=Nothing}) = [interp|
       case #{st}:
         if (debug) std::cerr << "Skipping state #{st}: \\"" << text << "\\"" << std::endl;
         goto start;
       |]
-    mkAct NoAction = ", \"\""
-    mkAct (Action act) = "," <> act
+    tokTypeMap = M.fromList tokNames
+    mkAct _ NoAction = ", std::any()"
+    mkAct tn (Action act) = case M.lookup tn tokTypeMap of
+      Just (Type t) -> [interp|,static_cast<#{t}>(#{act})|]
+      _ -> "," <> act
     checkChars (charGroup, newSt) = "if(" <> charCond charGroup <> ") goto state_" <> tshow newSt <> ";"
     charCond = T.intercalate "||" . map charCond1 . NE.toList
     charCond1 (CChar c) = "curCh == " <> tshow c

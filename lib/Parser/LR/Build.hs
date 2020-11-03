@@ -36,6 +36,7 @@ data Action = Shift Word
 data LRParser p = LRParser {
     lrTerminals :: [Symbol]
   , lrNonTerminals :: [Symbol]
+  , lrTypes :: M.Map Symbol Type
   , lrStates :: [Word]
   , lrExpected :: M.Map Word [Text]
   , lrStateSym :: M.Map Word Symbol
@@ -47,7 +48,8 @@ data LRParser p = LRParser {
 instance LRPoint p => Parser (LRParser p) where
   -- buildParser :: Monad m => Proxy parser -> ParserOptions Rules -> MyMonadT m ([(FilePath,Text)], parser)
   buildParser _ ParserOptions{..} = do
-    tokens <- get
+    tokensAndTypes <- get
+    let tokens = map fst tokensAndTypes
     automaton@(startState, transitionTable) <- postprocess $ buildLRAutomaton @p start r
     let shiftActions st tok
           | Just st' <- M.lookup (st, tok) transitionTable
@@ -92,6 +94,7 @@ instance LRPoint p => Parser (LRParser p) where
     return (debug, LRParser {
         lrTerminals = tokens
       , lrNonTerminals = nonTerminals
+      , lrTypes = M.fromList $ tokensAndTypes <> map getRuleType (NE.toList parserOptionsGrammarDefinition)
       , lrStates = M.elems stateMap
       , lrExpected = M.fromList expectedSymbols
       , lrStateSym = M.fromList stateToSym
@@ -100,6 +103,7 @@ instance LRPoint p => Parser (LRParser p) where
       , lrInitialState = stateIndex startState
       })
     where
+    getRuleType Rule{ruleName=h,ruleType=t} = (NonTerm h, t)
     reduceActions st tok
       | ps <- mapMaybe pointAction . filter (`lookaheadMatches` tok)
                 $ S.toList (pointClosure r st)
@@ -112,8 +116,8 @@ instance LRPoint p => Parser (LRParser p) where
     rules = parserOptionsGrammarDefinition
     isNonTerm (NonTerm x) = Just $ NonTerm x
     isNonTerm _ = Nothing
-    Rule start _ :| _ = rules
-    r = mkRulesMap (Rule ExtendedStartRule (BodyWithAction Nothing (extendedStartRuleBody start) Nothing :| []) <| rules)
+    Rule{ruleName=start} :| _ = rules
+    r = mkRulesMap (Rule ExtendedStartRule (BodyWithAction Nothing (extendedStartRuleBody start) Nothing :| []) NoType <| rules)
 
 buildLRAutomaton :: forall p. LRPoint p => Text -> RulesMap -> LRAutomaton p
 buildLRAutomaton oldStartRule r = (,) startState . fst . flip execState (M.empty, S.empty) $ buildGotoTable startState

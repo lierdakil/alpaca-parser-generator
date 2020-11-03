@@ -29,18 +29,18 @@ instance LRPoint p => ParserWriter (LRParser p) CPP where
 #define #{headerName}_H
 #include "lexer.h"
 #include <stack>
-#include <variant>
+#include <any>
 #{topTop gtop}
 class #{name}#{topInh gtop} {
   Lexer *lex;
   bool debug;
-  std::stack<std::pair<std::size_t,std::variant<ResultType,Token>>> stack;
+  std::stack<std::pair<std::size_t,std::any>> stack;
   static const std::size_t Action[#{statesLenStr}][#{termLenStr}];
   static const std::size_t GOTO[#{statesLenStr}][#{nonTermLenStr}];
   std::size_t top() const;
 public:
   #{name}(Lexer *lex, bool debug = false);
-  ResultType parse();
+  std::any parse();
 };
 #endif
 |]) , (base <> ".cpp", [interp|
@@ -63,7 +63,7 @@ const std::size_t #{name}::GOTO[#{statesLenStr}][#{nonTermLenStr}] = {
 };
 std::size_t #{name}::top() const { return stack.empty() ? 0 : stack.top().first; }
 #{name}::#{name}(Lexer *lex, bool debug):lex(lex),debug(debug) {}
-ResultType #{name}::parse() {
+std::any #{name}::parse() {
   Token a = lex->getNextToken();
   while (true) {
     auto action = Action[top()][static_cast<std::size_t>(a.first)];
@@ -71,7 +71,7 @@ ResultType #{name}::parse() {
     #{indent 2 actionCases}
     default:
       if(debug)std::cerr<<"Shift to "<<action<<std::endl;
-      stack.push({action, std::move(a)});
+      stack.push({action, std::move(a.second)});
       a=lex->getNextToken();
       break;
     }
@@ -129,7 +129,7 @@ ResultType #{name}::parse() {
     actionBody (Shift _) = error "does not happen"
     actionBody (Reduce ((ExtendedStartRule, _), _)) = [interp|
       stack.pop();
-      return std::move(std::get<0>(stack.top().second));
+      return std::move(stack.top().second);
       |]
     actionBody (Reduce ((h, body), mcode)) = [interp|
       if(debug) std::cerr << "Reduce using #{h} -> #{showBody body}\\n";
@@ -144,11 +144,18 @@ ResultType #{name}::parse() {
         result :: Text
         result
           | Just code <- mcode
-          = [interp|(#{T.strip code})|]
+          = [interp|(#{cast $ T.strip code})|]
           | otherwise
-          = "ResultType()"
-        showArg (NonTerm _) i = "auto _"<>tshow i<>"=std::move(std::get<0>(stack.top().second)); stack.pop();"
-        showArg _ i = "auto _"<>tshow i<>"=std::move(std::get<1>(stack.top().second).second); stack.pop();"
+          = "std::any()"
+        cast :: Text -> Text
+        cast y = case M.lookup (NonTerm h) lrTypes of
+          Just (Type t) -> [interp|static_cast<#{t}>(#{y})|]
+          _ -> y
+        showArg x i = case M.lookup x lrTypes of
+          Just (Type t) ->
+            [interp|auto _#{i} = std::any_cast<#{t}>(std::move(stack.top().second)); stack.pop();|]
+          _ ->
+            [interp|auto _#{i} = std::move(stack.top().second); stack.pop();|]
     nonTermIdx nt = fromJust $ M.lookup nt nonTerminalsMap
     nonTerminalsMap = M.fromList $ zip nonTerminals [0::Word ..]
     quote x = "\"" <> x <> "\""

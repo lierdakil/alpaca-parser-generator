@@ -32,6 +32,7 @@ instance ParserWriter LLParser CPP where
 #include <stack>
 #include <string>
 #include <variant>
+#include <any>
 #{topTop gtop}
 class #{className}#{topInh gtop} {
   enum class NonTerminal : std::size_t { #{T.intercalate ", " (map ("NT_" <>) nonTerms)} };
@@ -40,11 +41,11 @@ class #{className}#{topInh gtop} {
   Lexer *lex;
   bool debug;
   std::stack<Symbol> stack;
-  std::stack<std::variant<ResultType,Token>> resultStack;
+  std::stack<std::any> resultStack;
   static const std::size_t M[#{tshow(length nonTerms)}][#{tshow (length tokens)}];
 public:
   #{className}(Lexer *lex, bool debug);
-  ResultType parse();
+  std::any parse();
 };
 #endif
 |]
@@ -60,7 +61,7 @@ const std::size_t #{className}::M[#{tshow(length nonTerms)}][#{tshow (length tok
   #{indent 1 $ T.intercalate ",\n" $ map (braces . T.intercalate "," . map showIdx') transTable}
 };
 #{className}::#{className}(Lexer *lex, bool debug = false):lex(lex),debug(debug) {}
-ResultType #{className}::parse() {
+std::any #{className}::parse() {
   stack.push(#{encodeSymbol llStartSymbol});
   Token a = lex->getNextToken();
   while (!stack.empty()) {
@@ -69,7 +70,7 @@ ResultType #{className}::parse() {
           using T = std::decay_t<decltype(X)>;
           if constexpr (std::is_same_v<T, TokenType>) {
             if (a.first == X) {
-              resultStack.push(std::move(a));
+              resultStack.push(std::move(a.second));
               a = lex->getNextToken();
               stack.pop();
             } else {
@@ -95,7 +96,7 @@ ResultType #{className}::parse() {
           }
         }, stack.top());
   }
-  return std::move(std::get<0>(resultStack.top()));
+  return std::move(resultStack.top());
 }
 |]
     indent = indentLang 2
@@ -121,7 +122,7 @@ ResultType #{className}::parse() {
     |] :: Text
     makeBody _ _ = error "Should never happen"
     pushSymbol s = [interp|stack.push(#{encodeSymbol s});|] :: Text
-    makeAction ((_, body), mcode) n = [interp|
+    makeAction ((h, body), mcode) n = [interp|
       case #{showIdx n}: {
         #{indent 1 $ T.intercalate "\n" (reverse $ zipWith showArg body [1::Word ..])}
         resultStack.push(#{act});
@@ -130,17 +131,16 @@ ResultType #{className}::parse() {
       where
         act :: Text
         act | Just code <- mcode
-            = [interp|(#{code})|]
+            = case M.lookup h llTypes of
+                Just (Type t) -> [interp|static_cast<#{t}>(#{code})|]
+                _ -> [interp|(#{code})|]
             | otherwise
-            = "ResultType()"
-        showArg (NonTerm _) i = [interp|
-          auto _#{tshow i}=std::move(std::get<0>(resultStack.top()));
-          resultStack.pop();
-          |]
-        showArg _ i = [interp|
-          auto _#{tshow i}=std::move(std::get<1>(resultStack.top()).second);
-          resultStack.pop();
-          |]
+            = "std::any()"
+        showArg x i =
+          case M.lookup x llTypes of
+            Just (Type t) -> [interp|auto _#{tshow i}=std::any_cast<#{t}>(std::move(resultStack.top()));|]
+            _ -> [interp|auto _#{tshow i}=std::move(resultStack.top());|]
+          <> "resultStack.pop();"
 
 encodeSymbol :: Symbol -> Text
 encodeSymbol (NonTerm nt) = "NonTerminal::NT_" <> nt

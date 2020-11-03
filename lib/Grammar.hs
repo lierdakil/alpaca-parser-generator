@@ -10,6 +10,7 @@ module Grammar (
   , Assoc
   , AssocType(..)
   , Tops(..)
+  , Type(..)
   , parse
   , showBody
   , showSymbol
@@ -40,7 +41,7 @@ type Rules = NonEmpty Rule
 parse :: Monad m => Text -> MyMonadT m Grammar
 parse t = do
   gr <- grammar <$> scan t
-  tokens <- gets S.fromList
+  tokens <- gets (S.fromList . map fst)
   let gtoks = collectTerminals gr
   unless (gtoks `S.isSubsetOf` tokens) $
     throwError ["Undefined terminals in grammar: " <> tshow (S.toList (gtoks S.\\ tokens))]
@@ -48,7 +49,7 @@ parse t = do
 
 collectTerminals :: Grammar -> S.Set Symbol
 collectTerminals (Grammar _ rs) = foldMap ts rs
-  where ts (Rule _ b) = foldMap (foldMap us . bwaBody) b
+  where ts Rule{ruleBodies=b} = foldMap (foldMap us . bwaBody) b
         us (NonTerm _) = S.empty
         us x = S.singleton x
 
@@ -71,7 +72,7 @@ showSymbol (NonTerm t) = t
 
 mkRulesMap :: Rules -> RulesMap
 mkRulesMap = M.fromList . map ruleToTuple . NE.toList
-  where ruleToTuple (Rule h alts) = (h, alts)
+  where ruleToTuple Rule{ruleName=h,ruleBodies=alts} = (h, alts)
 
 first :: RulesMap -> [Symbol] -> S.Set (Maybe Symbol)
 first r = first' S.empty

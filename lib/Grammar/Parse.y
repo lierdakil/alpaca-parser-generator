@@ -1,8 +1,9 @@
 {
 {-# LANGUAGE OverloadedStrings #-}
-module Grammar.Parse where
+module Grammar.Parse (module Grammar.Parse, Type(..)) where
 
 import Grammar.Lex
+import Regex.Parse (Type(..))
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -15,6 +16,7 @@ import qualified Data.Text as T
   '->' { TArrow }
   '|'  { TAlternative }
   ';'  { TSep }
+  '::' { TDoubleColon }
   term { TTerminal $$ }
   teof { TTermEof }
   nont { TNonTerminal $$ }
@@ -41,7 +43,11 @@ Rules
   | Rule       { ($1 :|) }
 
 Rule
-  : nont '->' Alternatives ';' { Rule $1 ($3 []) }
+  : nont '->' Alternatives Type ';' { Rule $1 ($3 []) $4 }
+
+Type
+  : '::' braces { Type $ T.strip $2 }
+  | { NoType }
 
 Alternatives
   : Alternatives '|' BodyWithAction { $1 . ($3 :) }
@@ -73,7 +79,7 @@ Symbol
 data Grammar = Grammar Tops (NonEmpty Rule)
 data Tops = Tops { topTop :: Text, topInh :: Text }
 data Symbol = TermEof | Term Text | NonTerm Text deriving (Eq, Ord, Show)
-data Rule = Rule Text (NonEmpty BodyWithAction) deriving (Eq, Show)
+data Rule = Rule {ruleName :: Text, ruleBodies :: (NonEmpty BodyWithAction), ruleType :: Type} deriving (Eq, Show)
 data BodyWithAction = BodyWithAction {
     bwaAssoc :: Maybe Assoc
   , bwaBody :: Body
