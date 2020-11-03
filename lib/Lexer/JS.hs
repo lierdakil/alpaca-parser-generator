@@ -99,8 +99,8 @@ module.exports = {TokenType, tokToStr, Lexer}
         break
       |]
     transTable = T.intercalate "\n" $ mapMaybe checkState stList
-    tokDefns = T.intercalate ",\n" $ zipWith (\x n -> [interp|Tok_#{x}: #{n}|] :: Text) tokNames [1::Word ..]
-    tokToStr = T.intercalate "\n" $ zipWith (\x n -> [interp|case #{n}: return '#{x}'|] :: Text) tokNames [1::Word ..]
+    tokDefns = T.intercalate ",\n" $ zipWith (\x n -> [interp|Tok_#{fst x}: #{n}|] :: Text) tokNames [1::Word ..]
+    tokToStr = T.intercalate "\n" $ zipWith (\x n -> [interp|case #{n}: return '#{fst x}'|] :: Text) tokNames [1::Word ..]
     mkAct NoAction = "null"
     mkAct (Action act) = act
     checkChars :: (NE.NonEmpty CharPattern, Int) -> Text

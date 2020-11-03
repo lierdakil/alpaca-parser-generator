@@ -77,7 +77,7 @@ class Lexer:
           break
       |]
     transTable = T.intercalate "\nel" $ mapMaybe checkState stList
-    tokDefns = T.intercalate "\n" $ zipWith (\x n -> [interp|Tok_#{x} = #{n}|] :: Text) tokNames [1::Word ..]
+    tokDefns = T.intercalate "\n" $ zipWith (\x n -> [interp|Tok_#{fst x} = #{n}|] :: Text) tokNames [1::Word ..]
     mkAct NoAction = "None"
     mkAct (Action act) = act
     checkChars :: (NE.NonEmpty CharPattern, Int) -> Text
