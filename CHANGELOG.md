@@ -1,3 +1,7 @@
+## 0.2.0.1
+
+-   [Parsers][C++] cast to rvalue reference
+
 ## 0.2.0.0
 
 -   Add jack-analyzer example
