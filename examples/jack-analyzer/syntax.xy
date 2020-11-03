@@ -1,0 +1,179 @@
+class /class/ {text}
+primType /boolean|char|int/ {text}
+
+propType /field|static/ {text}
+
+methodCategory /constructor|function|method/ {text}
+
+if /if/ {text}
+do /do/ {text}
+while /while/ {text}
+let /let/ {text}
+return /return/ {text}
+
+else /else/ {text}
+
+void /void/ {text}
+var /var/ {text}
+
+primVal /this|null|true|false/ {text}
+
+identifier /[a-zA-Z_][0-9a-zA-Z_]*/ {text}
+integerConstant /[0-9]+/ {int(text)}
+stringConstant /"[^"]*"/ {text[1:-1]}
+lb /\{/ {text}
+rb /\}/ {text}
+binOp /[\|&><\*\+\/]/ {text}
+equals /=/ {text}
+minus /\-/ {text}
+not /~/ {text}
+lp /\(/ {text}
+rp /\)/ {text}
+c  /,/ {text}
+dot  /\./ {text}
+sc /;/ {text}
+lbr /\[/ {text}
+rbr /\]/ {text}
+
+/[ \t\r\n]/
+/?\/\*.*\*\//
+/\/\/[^\n]*\n/
+
+%%
+
+%top {
+from parserTypes import *
+}
+
+S : Class %eof { _1 }
+  ;
+
+Class
+  : class Identifier lb ClassDef rb { Class(_2, _4) }
+  ;
+
+ClassDef
+  : PropDefs MethodDefs { (_1, _2) }
+  ;
+
+PropDefs
+  :                   { [] }
+  | PropDef PropDefs  { [_1] + _2 }
+  ;
+
+PropDef
+  : propType Type Identifiers sc { PropDef(_1, _2, _3) }
+  ;
+
+MethodDefs
+  :                       { [] }
+  | MethodDef MethodDefs  { [_1] + _2 }
+  ;
+
+MethodDef
+  : methodCategory ReturnType Identifier lp Parameters rp
+    lb MethodBody rb { MethodDef(_1, _2, _3, _5, _8) }
+  ;
+
+Parameters
+  :             { [] }
+  | Parameters1 { _1 }
+  ;
+
+Parameters1
+  : Parameter               { [_1] }
+  | Parameter c Parameters1 { [_1] + _3 }
+  ;
+
+Parameter
+  : Type Identifier { Parameter(_1, _2) }
+  ;
+
+Identifiers
+  : Identifier               { [_1] }
+  | Identifier c Identifiers { [_1] + _3 }
+  ;
+
+ReturnType
+  : Type { _1 }
+  | void { PrimType("void") }
+  ;
+
+Type
+  : primType   { PrimType(_1) }
+  | Identifier { _1 }
+  ;
+
+MethodBody
+  : LocalDefs Statements { Body(_1, _2) }
+  ;
+
+LocalDefs
+  :                    { [] }
+  | LocalDef sc LocalDefs { [_1] + _3 }
+  ;
+
+LocalDef
+  : var Type Identifiers { LocalDef(_2, _3) }
+  ;
+
+Statements
+  : { [] }
+  | Statement Statements { [_1] + _2 }
+  ;
+
+Statement
+  : if lp Expr rp lb Statements rb ElseBlock { IfStmt(_3, _6, _8) }
+  | while lp Expr rp lb Statements rb { WhileStmt(_3, _6) }
+  | do Call sc { DoStmt(_2) }
+  | let ArrayExpr equals Expr sc { LetStmt(_2, _4) }
+  | return Expr sc { ReturnStmt(_2) }
+  | return sc { ReturnStmt() }
+  ;
+
+ArrayExpr
+  : Identifier { _1 }
+  | Identifier lbr Expr rbr  { ArrayExpr(_1, _3) }
+  ;
+
+Identifier
+  : identifier { Identifier(_1) }
+  ;
+
+Expr
+  : primVal    { Term(PrimVal(_1)) }
+  | ArrayExpr  { Term(_1) }
+  | Call       { Term(_1) }
+  | %left1 Expr binOp Expr  { BinOp(_2, _1, _3) }
+  | %left1 Expr equals Expr { BinOp('=', _1, _3) }
+  | %left1 Expr minus Expr { BinOp('-', _1, _3) }
+  | %left5 not Expr   { Not(_2) }
+  | %left5 minus Expr { Neg(_2) }
+  | lp Expr rp { Parens(_2) }
+  | integerConstant { Term(IntConst(_1)) }
+  | stringConstant  { Term(StrConst(_1)) }
+  ;
+
+Call
+  : MethodChain lp Arguments rp { Call(_1, _3) }
+  ;
+
+MethodChain
+  : Identifier                 { [_1] }
+  | Identifier dot MethodChain { [_1] + _3 }
+  ;
+
+Arguments
+  :            { [] }
+  | Arguments1 { _1 }
+  ;
+
+Arguments1
+  : Expr              { [_1] }
+  | Expr c Arguments1 { [_1] + _3 }
+  ;
+
+ElseBlock
+  : else lb Statements rb { _3 }
+  |                       { None }
+  ;
