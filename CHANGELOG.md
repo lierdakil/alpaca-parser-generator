@@ -1,3 +1,8 @@
+## 0.2.0.2
+
+-   [Examples] Rework jack-analyzer to be LL(1)
+-   [Fix] Fix LL1 parser issues for grammars with ambiguity
+
 ## 0.2.0.1
 
 -   [Parsers][C++] cast to rvalue reference
