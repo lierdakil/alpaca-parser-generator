@@ -1,4 +1,4 @@
-number /[0-9]+/ parseInt(text, 10)
+number /[0-9]+/ { parseInt(text, 10) }
 add /\+/
 sub /\-/
 mul /\*/
