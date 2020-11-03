@@ -1,3 +1,13 @@
+## 0.2.0.0
+
+-   Add jack-analyzer example
+-   Optional explicit typing. Comes with a syntax change, hence the big version bump
+-   Non-greedy patterns
+-   Negative character groups
+-   Allow lexer character escapes and escape graphviz labels
+-   Allow lexer-only syntax files
+-   Prefer more specific lexer rules to less specific ones. Prefer rules defined earlier in the file to rules defined later.
+
 ## 0.1.3.1
 
 -   [Lexer] Rework ambiguity handler, use more efficient algorithm
