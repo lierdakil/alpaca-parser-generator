@@ -1,0 +1,249 @@
+class /class/ {text} :: std::string
+primType /boolean|char|int/ {text} :: std::string
+
+propType /field|static/ {text} :: std::string
+
+methodCategory /constructor|function|method/ {text} :: std::string
+
+if /if/ {text} :: std::string
+do /do/ {text} :: std::string
+while /while/ {text} :: std::string
+let /let/ {text} :: std::string
+return /return/ {text} :: std::string
+
+else /else/ {text} :: std::string
+
+void /void/ {text} :: std::string
+var /var/ {text} :: std::string
+
+primVal /this|null|true|false/ {text} :: std::string
+
+identifier /[a-zA-Z_][0-9a-zA-Z_]*/ {text} :: std::string
+integerConstant /[0-9]+/ {text} :: std::string
+stringConstant /"[^"]*"/ {text} :: std::string
+lb /\{/ {text} :: std::string
+rb /\}/ {text} :: std::string
+binOp /[\|&><\*\+\/]/ {text} :: std::string
+equals /=/ {text} :: std::string
+minus /\-/ {text} :: std::string
+not /~/ {text} :: std::string
+lp /\(/ {text} :: std::string
+rp /\)/ {text} :: std::string
+c  /,/ {text} :: std::string
+dot  /\./ {text} :: std::string
+sc /;/ {text} :: std::string
+lbr /\[/ {text} :: std::string
+rbr /\]/ {text} :: std::string
+
+/[ \t\r\n]/
+/?\/\*.*\*\//
+/\/\/[^\n]*\n/
+
+%%
+
+%top {
+#include <utility>
+#include <list>
+#include <functional>
+#include "format.h"
+
+namespace ph = std::placeholders;
+}
+
+S : Class %eof { _1 }
+  :: {str}
+  ;
+
+Class
+  : class Identifier lb ClassDef rb { Class(_2, _4) }
+  :: {str}
+  ;
+
+ClassDef
+  : PropDefs MethodDefs { std::pair(_1, _2) }
+  :: { std::pair<lst,lst> }
+  ;
+
+PropDefs
+  :                   { lst({}) }
+  | PropDef PropDefs  { prepend(std::move(_2), _1) }
+  :: {lst}
+  ;
+
+PropDef
+  : propType Type Identifiers sc { PropDef(_1, _2, _3) }
+  :: {str}
+  ;
+
+MethodDefs
+  :                       { lst({}) }
+  | MethodDef MethodDefs  { prepend(std::move(_2), _1) }
+  :: {lst}
+  ;
+
+MethodDef
+  : methodCategory ReturnType Identifier lp Parameters rp
+    lb MethodBody rb { MethodDef(_1, _2, _3, _5, _8) }
+  :: {std::string}
+  ;
+
+Parameters
+  :             { lst({}) }
+  | Parameters1 { _1 }
+  :: {lst}
+  ;
+
+Parameters1
+  : Parameter Parameters1Rest  { prepend(std::move(_2), _1) }
+  :: {lst}
+  ;
+
+Parameters1Rest
+  : c Parameters1 { _2 }
+  | { lst({}) }
+  :: {lst}
+  ;
+
+Parameter
+  : Type Identifier { _1 + "\n" + _2 }
+  :: {str}
+  ;
+
+Identifiers
+  : Identifier IdentifiersRest { prepend(std::move(_2), _1) }
+  :: {lst}
+  ;
+
+IdentifiersRest
+  : c Identifiers { _2 }
+  | { lst({}) }
+  :: {lst}
+  ;
+
+ReturnType
+  : Type { _1 }
+  | void { "<keyword> void </keyword>\n" }
+  :: {str}
+  ;
+
+Type
+  : primType   { Type(_1) }
+  | Identifier { _1 }
+  :: {str}
+  ;
+
+MethodBody
+  : LocalDefs Statements { Body(_1, _2) }
+  :: {str}
+  ;
+
+LocalDefs
+  :                    { lst({}) }
+  | LocalDef sc LocalDefs { prepend(std::move(_3),_1) }
+  :: {lst}
+  ;
+
+LocalDef
+  : var Type Identifiers { LocalDef(_2, _3) }
+  :: {str}
+  ;
+
+Statements
+  : { lst({}) }
+  | Statement Statements { prepend(std::move(_2), _1) }
+  :: {lst}
+  ;
+
+Statement
+  : if lp Expr rp lb Statements rb ElseBlock { IfStmt(_3, _6, _8) }
+  | while lp Expr rp lb Statements rb { WhileStmt(_3, _6) }
+  | do Call sc { DoStmt(_2) }
+  | let ArrayExpr equals Expr sc { LetStmt(_2, _4) }
+  | return ExprOrNothing sc { ReturnStmt(_2) }
+  :: {str}
+  ;
+
+ExprOrNothing
+  : Expr { _1 }
+  | { "" }
+  :: {str}
+  ;
+
+ArrayExpr
+  : Identifier Arr { _2(_1) }
+  :: {str}
+  ;
+
+Arr
+  : lbr Expr rbr  { [_2=std::move(_2)](auto x) { return ArrayExpr(x, _2); } }
+  | MethodRest lp Arguments rp { [_1=std::move(_1),_3=std::move(_3)](auto x) { return Call(prepend(std::move(_1), x), _3); } }
+  | { [](auto x) { return x; } }
+  :: { std::function<str(str)> }
+  ;
+
+Identifier
+  : identifier { Identifier(_1) }
+  :: {str}
+  ;
+
+Expr : Expr1 Expr2 { _2(_1) }
+     :: {str}
+     ;
+
+Expr1
+  : primVal    { Term(PrimVal(_1)) }
+  | ArrayExpr  { Term(_1) }
+  | %left5 not Expr1   { Not(_2) }
+  | %left5 minus Expr1 { Neg(_2) }
+  | lp Expr rp { Parens(_2) }
+  | integerConstant { Term(IntConst(_1)) }
+  | stringConstant  { Term(StrConst(_1)) }
+  :: {str}
+  ;
+
+Expr2
+  :             { [](auto x) { return x; } }
+  | binOp Expr  { [_1=std::move(_1),_2=std::move(_2)](auto x) { return BinOp(_1,  x, _2); } }
+  | equals Expr { [_2=std::move(_2)](auto x)     { return BinOp("=", x, _2); } }
+  | minus Expr  { [_2=std::move(_2)](auto x)     { return BinOp("-", x, _2); } }
+  :: {std::function<str(str)>}
+  ;
+
+Call
+  : MethodChain lp Arguments rp { Call(_1, _3) }
+  :: {str}
+  ;
+
+MethodChain
+  : Identifier MethodRest                { prepend(std::move(_2), _1) }
+  :: {lst}
+  ;
+
+MethodRest
+  : dot MethodChain { _2 }
+  | { lst({}) }
+  :: {lst}
+  ;
+
+Arguments
+  :            { lst({}) }
+  | Arguments1 { _1 }
+  :: {lst}
+  ;
+
+Arguments1
+  : Expr ArgumentsRest { prepend(std::move(_2), _1) }
+  :: {lst}
+  ;
+
+ArgumentsRest
+  : c Arguments1 { _2 }
+  | { lst({}) }
+  :: {lst}
+  ;
+
+ElseBlock
+  : else lb Statements rb { _3 }
+  |                       { lst({}) }
+  :: {lst}
+  ;
