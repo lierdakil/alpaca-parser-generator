@@ -18,7 +18,7 @@ jobs:
     container: ${{ matrix.container }}
     steps:
     - uses: actions/checkout@v2
-    - uses: actions/setup-haskell@v1
+    - uses: haskell/actions/setup@v1
       if: runner.os != 'Linux'
       with:
         ghc-version: ${{matrix.ghc}}
