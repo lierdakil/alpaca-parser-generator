@@ -7,10 +7,10 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        ghc: ['8.8.4']
+        ghc: ['8.10.4']
         include:
         - os: ubuntu-latest
-          container: 'lierdakil/alpine-haskell:8.8.4-pwsh'
+          container: 'lierdakil/alpine-haskell:8.10.4-pwsh'
           config: static-build-cabal-config
         - os: windows-latest
           config: dynamic-build-cabal-config
