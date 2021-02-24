@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 2b8c50c37d2a6c01849d95c0788ef1a2ddcbcb732a75ed923567b398d56421e6
+-- hash: 14263091f56ec6a449440a0fdcf08fb136ad84809926e5ebd3bea5b9b2fed719
 
 name:           alpaca-parser-generator
 version:        0.2.0.2
@@ -72,6 +72,6 @@ executable alpaca
     , optparse-applicative >=0.15.1 && <0.16
     , string-interpolate >=0.2.0 && <0.3
     , table-layout >=0.8.0 && <0.10
-    , template-haskell >=2.14.0 && <2.16
+    , template-haskell >=2.14.0 && <2.17
     , text >=1.2.3 && <1.3
   default-language: Haskell2010
