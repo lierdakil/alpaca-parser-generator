@@ -25,9 +25,9 @@ instance ParserWriter RecursiveParser CPP where
   --writeParser :: forall a. Proxy lang -> ParserOptions a -> parser -> [(FilePath,Text)]
   writeParser _ gtop ParserOptions{..} RecursiveParser{..} =
     [(basename <> ".h", [interp|
-#ifndef #{headerName}_H
-#define #{headerName}_H
-#include "lexer.h"
+\#ifndef #{headerName}_H
+\#define #{headerName}_H
+\#include "lexer.h"
 #{topTop gtop}
 class #{parserOptionsName}#{topInh gtop} {
   Lexer *lex;
@@ -38,11 +38,11 @@ public:
   #{parserOptionsName}(Lexer *lex, bool debug = false);
   #{startRuleType} parse();
 };
-#endif
+\#endif
 |]) ,(basename <> ".cpp", [interp|
-#include "#{basename}.h"
-#include <stdexcept>
-#include <iostream>
+\#include "#{basename}.h"
+\#include <stdexcept>
+\#include <iostream>
 #{parserOptionsName}::#{parserOptionsName}(Lexer *lex, bool debug):lex(lex),debug(debug){
   curTok = lex->getNextToken();
 }

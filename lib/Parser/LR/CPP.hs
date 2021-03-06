@@ -25,11 +25,11 @@ instance LRPoint p => ParserWriter (LRParser p) CPP where
   --writeParser :: Proxy lang -> Text -> ParserOptions a -> parser -> [(FilePath,Text)]
   writeParser _ gtop ParserOptions{..} LRParser{..} = [
       (base <> ".h", [interp|
-#ifndef #{headerName}_H
-#define #{headerName}_H
-#include "lexer.h"
-#include <stack>
-#include <any>
+\#ifndef #{headerName}_H
+\#define #{headerName}_H
+\#include "lexer.h"
+\#include <stack>
+\#include <any>
 #{topTop gtop}
 class #{name}#{topInh gtop} {
   Lexer *lex;
@@ -42,11 +42,11 @@ public:
   #{name}(Lexer *lex, bool debug = false);
   std::any parse();
 };
-#endif
+\#endif
 |]) , (base <> ".cpp", [interp|
-#include "#{baseText}.h"
-#include <stdexcept>
-#include <iostream>
+\#include "#{baseText}.h"
+\#include <stdexcept>
+\#include <iostream>
 static const std::string stateToString(std::size_t state) {
   static constexpr const char* names[] = {#{stateToString}};
   return names[state];

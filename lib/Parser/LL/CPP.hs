@@ -26,13 +26,13 @@ instance ParserWriter LLParser CPP where
     basename = parserOptionsBaseFileName
     tokens = llTerminals
     headerFile = [interp|
-#ifndef PARSER_LL_H
-#define PARSER_LL_H
-#include "lexer.h"
-#include <stack>
-#include <string>
-#include <variant>
-#include <any>
+\#ifndef PARSER_LL_H
+\#define PARSER_LL_H
+\#include "lexer.h"
+\#include <stack>
+\#include <string>
+\#include <variant>
+\#include <any>
 #{topTop gtop}
 class #{className}#{topInh gtop} {
   enum class NonTerminal : std::size_t { #{T.intercalate ", " (map ("NT_" <>) nonTerms)} };
@@ -47,12 +47,12 @@ public:
   #{className}(Lexer *lex, bool debug);
   std::any parse();
 };
-#endif
+\#endif
 |]
     sourceFile = [interp|
-#include "#{basename}.h"
-#include <stdexcept>
-#include <iostream>
+\#include "#{basename}.h"
+\#include <stdexcept>
+\#include <iostream>
 const std::string #{className}::to_string(NonTerminal nt) {
   static constexpr const char *names[] = { #{T.intercalate "," (map quote nonTerms)} };
   return names[static_cast<std::size_t>(nt)];

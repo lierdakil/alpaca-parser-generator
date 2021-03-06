@@ -112,7 +112,7 @@ class #{name}#{topInh gtop}:
     actionBody (Reduce ((h, body), mcode)) = [interp|
       if self.debug: print("Reduce using #{h} -> #{showBody body}")
       #{T.intercalate "\n" (reverse $ zipWith showArg body [1::Word ..])}
-      gt = self.GOTO[self.top()][#{tshow (nonTermIdx (NonTerm h))}] # #{h}
+      gt = self.GOTO[self.top()][#{tshow (nonTermIdx (NonTerm h))}] \# #{h}
       if gt==0: raise Exception("No goto")
       if self.debug:
           print(f'{self.top()} is now on top of the stack;')

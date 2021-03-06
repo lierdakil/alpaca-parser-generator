@@ -14,12 +14,12 @@ import Utils
 instance LexerWriter CPP where
   writeLexer _ accSt tokNames stList =
     [ ("lexer.h", [interp|
-#ifndef LEXER_H
-#define LEXER_H
-#include <cstddef>
-#include <string>
-#include <utility>
-#include <any>
+\#ifndef LEXER_H
+\#define LEXER_H
+\#include <cstddef>
+\#include <string>
+\#include <utility>
+\#include <any>
 enum class TokenType : std::size_t {
   eof, #{T.intercalate "," (map (("Tok_"<>) . fst) tokNames)}
 };
@@ -35,11 +35,11 @@ public:
   Lexer(const std::string &input, bool debug = false);
   Token getNextToken();
 };
-#endif
+\#endif
 |]), ("lexer.cpp", [interp|
-#include "lexer.h"
-#include <stdexcept>
-#include <iostream>
+\#include "lexer.h"
+\#include <stdexcept>
+\#include <iostream>
 const std::string to_string(TokenType tt){
   static constexpr const char *names[] = { #{tokReflect} };
   return names[static_cast<std::size_t>(tt)];
@@ -57,11 +57,11 @@ Token Lexer::getNextToken() {
   auto lastReadChIx = curChIx;
   curChIx = lastAccChIx;
   std::string_view text_(&*startChIx, std::distance(startChIx, curChIx));
-#define text (std::string(text_))
+\#define text (std::string(text_))
   switch(accSt){
     #{indent 2 returnResult}
   }
-#undef text
+\#undef text
   if (curChIx == endIx) {
   if (debug) std::cerr << "Got EOF while lexing \\"" << text_ << "\\"" << std::endl;
   return {TokenType::eof, ""}; }
