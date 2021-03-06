@@ -1,3 +1,11 @@
+## 0.2.0.3
+
+-   Fix a minor bug in DFA construction
+
+    1-character ranges weren't handled correctly.
+
+-   Add C++ jack-analyzer example
+
 ## 0.2.0.2
 
 -   [Examples] Rework jack-analyzer to be LL(1)
