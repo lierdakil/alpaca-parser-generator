@@ -29,7 +29,8 @@ jobs:
         $store = Join-Path $pwd ".cabal-store"
         New-Item -ItemType Directory -Force "$store"
         cabal user-config init --force --augment="store-dir: $store" `
-          --augment="install-method: copy"
+          --augment="install-method: copy" `
+          --augment="overwrite-policy: always"
         $bindir = Join-Path $store "bin"
         echo "$bindir" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
     - name: Cabal update
