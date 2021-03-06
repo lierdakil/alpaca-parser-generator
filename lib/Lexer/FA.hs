@@ -112,14 +112,14 @@ nfaToDFASt nfa = do
 -- prefer more concrete definitions to less concrete,
 -- i.e. prefer char to range, etc.
 containsCR :: CharPattern -> CharPattern -> Bool
-containsCR CAny _ = True
-containsCR _ CAny = False -- nothing contains any
+containsCR CAny _ = True  -- any contains anything
+containsCR _ CAny = False -- nothing besides any contains any
 containsCR (CNot (CNot a)) b = containsCR a b
 containsCR a (CNot (CNot b)) = containsCR a b
 containsCR (CNot a) (CNot b) = containsCR b a
 containsCR (CNot a) b = not $ containsCR a b
 containsCR _a (CNot _b) = False
-containsCR CChar{} CRange{} = False -- char doesn't contain range
+containsCR (CChar c) (CRange a b) = c == a && c == b -- if range is one-character
 containsCR (CChar c1) (CChar c2) = c1 == c2
 containsCR (CRange a b) (CChar c1) = c1 >= a && c1 <= b
 containsCR (CRange a b) (CRange c d) = a <= c && b >= d
