@@ -44,8 +44,8 @@ class #{className}#{topInh gtop} {
   std::stack<std::any> resultStack;
   static const std::size_t M[#{tshow(length nonTerms)}][#{tshow (length tokens)}];
 public:
-  #{className}(Lexer *lex, bool debug);
   std::any parse();
+  #{className}(Lexer *lex, bool debug = false);
 };
 \#endif
 |]
@@ -60,8 +60,8 @@ const std::string #{className}::to_string(NonTerminal nt) {
 const std::size_t #{className}::M[#{tshow(length nonTerms)}][#{tshow (length tokens)}] = {
   #{indent 1 $ T.intercalate ",\n" $ map (braces . T.intercalate "," . map showIdx') transTable}
 };
-#{className}::#{className}(Lexer *lex, bool debug = false):lex(lex),debug(debug) {}
 std::any #{className}::parse() {
+#{className}::#{className}(Lexer *lex, bool debug):lex(lex),debug(debug) {}
   stack.push(#{encodeSymbol llStartSymbol});
   Token a = lex->getNextToken();
   while (!stack.empty()) {
