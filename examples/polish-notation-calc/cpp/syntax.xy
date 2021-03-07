@@ -12,6 +12,7 @@ pow /\^/
 }
 
 S : E %eof  { double(_1) }
+  :: { double }
   ;
 E : add E E { _2 + _3 }
   | sub E E { _2 - _3 }

@@ -14,7 +14,7 @@ int main(int argc, char *argv[]) {
       Lexer lex(line, debug);
       Parser parser(&lex, debug);
       auto expr = parser.parse();
-      std::cout << "Result: " << std::any_cast<double>(expr) << std::endl;
+      std::cout << "Result: " << expr << std::endl;
     } catch (std::runtime_error &e) {
       std::cerr << "Error while parsing:" << e.what() << std::endl;
     }
