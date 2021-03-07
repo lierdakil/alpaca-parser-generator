@@ -1,3 +1,8 @@
+## 0.2.1.0
+
+-   \[CPP\]\[LL1\/LR\] Fix parse return type when start rule type specified
+-   \[CPP\]\[LL1\] Fix debug default value
+
 ## 0.2.0.3
 
 -   Fix a minor bug in DFA construction
