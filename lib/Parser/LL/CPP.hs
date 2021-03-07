@@ -44,8 +44,8 @@ class #{className}#{topInh gtop} {
   std::stack<std::any> resultStack;
   static const std::size_t M[#{tshow(length nonTerms)}][#{tshow (length tokens)}];
 public:
-  std::any parse();
   #{className}(Lexer *lex, bool debug = false);
+  #{startRuleType} parse();
 };
 \#endif
 |]
@@ -60,8 +60,8 @@ const std::string #{className}::to_string(NonTerminal nt) {
 const std::size_t #{className}::M[#{tshow(length nonTerms)}][#{tshow (length tokens)}] = {
   #{indent 1 $ T.intercalate ",\n" $ map (braces . T.intercalate "," . map showIdx') transTable}
 };
-std::any #{className}::parse() {
 #{className}::#{className}(Lexer *lex, bool debug):lex(lex),debug(debug) {}
+#{startRuleType} #{className}::parse() {
   stack.push(#{encodeSymbol llStartSymbol});
   Token a = lex->getNextToken();
   while (!stack.empty()) {
@@ -96,10 +96,14 @@ std::any #{className}::parse() {
           }
         }, stack.top());
   }
-  return std::move(resultStack.top());
+  return #{castedResult "resultStack.top()"};
 }
 |]
     indent = indentLang 2
+    castedResult :: Text -> Text
+    (startRuleType, castedResult) = case M.lookup llStartSymbol llTypes of
+      Just (Type t) -> (t, \x -> [interp|std::any_cast<#{t}>(#{x})|])
+      _ -> ("std::any", \x -> [interp|std::move(#{x})|])
     className = parserOptionsName
     (transTable, actionMap) = indexTable p
     nonTerms = mapMaybe getNt llNonTerminals

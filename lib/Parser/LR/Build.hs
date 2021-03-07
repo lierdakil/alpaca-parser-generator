@@ -94,7 +94,7 @@ instance LRPoint p => Parser (LRParser p) where
     return (debug, LRParser {
         lrTerminals = tokens
       , lrNonTerminals = nonTerminals
-      , lrTypes = M.fromList $ tokensAndTypes <> map getRuleType (NE.toList parserOptionsGrammarDefinition)
+      , lrTypes = M.fromList $ tokensAndTypes <> map getRuleType (NE.toList extendedRules)
       , lrStates = M.elems stateMap
       , lrExpected = M.fromList expectedSymbols
       , lrStateSym = M.fromList stateToSym
@@ -116,8 +116,9 @@ instance LRPoint p => Parser (LRParser p) where
     rules = parserOptionsGrammarDefinition
     isNonTerm (NonTerm x) = Just $ NonTerm x
     isNonTerm _ = Nothing
-    Rule{ruleName=start} :| _ = rules
-    r = mkRulesMap (Rule ExtendedStartRule (BodyWithAction Nothing (extendedStartRuleBody start) Nothing :| []) NoType <| rules)
+    Rule{ruleName=start, ruleType=type'} :| _ = rules
+    extendedRules = Rule ExtendedStartRule (BodyWithAction Nothing (extendedStartRuleBody start) Nothing :| []) type' <| rules
+    r = mkRulesMap extendedRules
 
 buildLRAutomaton :: forall p. LRPoint p => Text -> RulesMap -> LRAutomaton p
 buildLRAutomaton oldStartRule r = (,) startState . fst . flip execState (M.empty, S.empty) $ buildGotoTable startState

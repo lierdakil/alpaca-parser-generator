@@ -40,7 +40,7 @@ class #{name}#{topInh gtop} {
   std::size_t top() const;
 public:
   #{name}(Lexer *lex, bool debug = false);
-  std::any parse();
+  #{startRuleType} parse();
 };
 \#endif
 |]) , (base <> ".cpp", [interp|
@@ -63,7 +63,7 @@ const std::size_t #{name}::GOTO[#{statesLenStr}][#{nonTermLenStr}] = {
 };
 std::size_t #{name}::top() const { return stack.empty() ? 0 : stack.top().first; }
 #{name}::#{name}(Lexer *lex, bool debug):lex(lex),debug(debug) {}
-std::any #{name}::parse() {
+#{startRuleType} #{name}::parse() {
   Token a = lex->getNextToken();
   while (true) {
     auto action = Action[top()][static_cast<std::size_t>(a.first)];
@@ -78,6 +78,10 @@ std::any #{name}::parse() {
   }
 }|])]
     where
+    castedResult :: Text -> Text
+    (startRuleType, castedResult) = case M.lookup (NonTerm ExtendedStartRule) lrTypes of
+      Just (Type t) -> (t, \x -> [interp|std::any_cast<#{t}>(#{x})|])
+      _ -> ("std::any", \x -> [interp|std::move(#{x})|])
     indent = indentLang 2
     base = parserOptionsBaseFileName
     name = parserOptionsName
@@ -129,7 +133,7 @@ std::any #{name}::parse() {
     actionBody (Shift _) = error "does not happen"
     actionBody (Reduce ((ExtendedStartRule, _), _)) = [interp|
       stack.pop();
-      return std::move(stack.top().second);
+      return #{castedResult "stack.top().second"};
       |]
     actionBody (Reduce ((h, body), mcode)) = [interp|
       if(debug) std::cerr << "Reduce using #{h} -> #{showBody body}\\n";
