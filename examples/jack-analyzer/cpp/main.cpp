@@ -106,7 +106,7 @@ void analyzeFile(std::string fn) {
   // Parser part
   auto lex1 = new Lexer(content, debug);
   auto parser = new Parser(lex1, debug);
-  std::cout << std::any_cast<std::string>(parser->parse());
+  std::cout << parser->parse();
 }
 
 int main(int argc, char *argv[]) {
