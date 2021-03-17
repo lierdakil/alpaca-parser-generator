@@ -4,10 +4,10 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 383b5eeb7c38abe0a7905af2e20be4f8ec91b694d0d4ce9530bd047b04d823b6
+-- hash: 718824e289de5167e781429642306edc9f8ed71be367cc7e662f51a609d3384f
 
 name:           alpaca-parser-generator
-version:        0.2.1.0
+version:        0.2.1.1
 author:         Nikolay Yakimov
 maintainer:     root@livid.pp.ru
 license:        MIT
