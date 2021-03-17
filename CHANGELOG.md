@@ -1,3 +1,10 @@
+## 0.2.1.1
+
+-   Bump version
+-   \[Fix\] Replace · with an ascii .
+-   \[Example\]\[CPP\] Update jack-analyzer
+-   \[Example\]\[CPP\] Update polish-notation-calc cpp example
+
 ## 0.2.1.0
 
 -   \[CPP\]\[LL1\/LR\] Fix parse return type when start rule type specified
