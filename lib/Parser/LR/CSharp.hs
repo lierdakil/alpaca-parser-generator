@@ -92,7 +92,7 @@ public class #{className}#{topInh gtop} {
             i <- gets snd
             modify (M.insert act i *** (+1))
             return i
-    stateToString = T.intercalate "," $ "\"·\"" : map (quote . showSymbol) (M.elems lrStateSym)
+    stateToString = T.intercalate "," $ "\".\"" : map (quote . showSymbol) (M.elems lrStateSym)
     expectedSym = T.intercalate "," $ map (quote . T.intercalate "/") $ M.elems lrExpected
     actionCases = T.intercalate "\n" $ mapMaybe writeAction $ M.toList actionsMap
     writeAction (Shift _, _) = Nothing
