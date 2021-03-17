@@ -9,6 +9,8 @@ import Parser.LR
 
 import System.FilePath
 import System.Directory
+import Data.Text.Encoding
+import qualified Data.ByteString as BS
 import Data.Proxy
 import Control.Monad
 import Data.List
@@ -16,7 +18,6 @@ import Data.Char
 import Data.Bifunctor
 import Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Text.IO as T
 import Options.Applicative hiding (Parser)
 import qualified Options.Applicative as OA
 import Data.Version
@@ -27,7 +28,7 @@ type MainProgram = Bool -> Text -> FilePath -> FilePath -> IO ()
 runProgram :: (LexerWriter lang, ParserWriter parser lang) =>
               Proxy lang -> Proxy parser -> MainProgram
 runProgram lang parserMethod debugLexer parserName baseFileName inputFile = do
-  input <- T.readFile inputFile
+  input <- decodeUtf8 <$> BS.readFile inputFile
   let (lexicRaw, grammarLines) = second (drop 1) . break ((=="%%") . T.filter (/='\r')) $ T.lines input
       rootdir = takeDirectory inputFile
       grammar = T.unlines grammarLines
@@ -35,7 +36,7 @@ runProgram lang parserMethod debugLexer parserName baseFileName inputFile = do
   setCurrentDirectory rootdir
   runInIO $ do
     writeFiles =<< makeLexer lang debugLexer lexic
-    unless (T.null grammar) $ 
+    unless (T.null grammar) $
       wrap parserName $ makeParser lang parserMethod ParserOptions{
           parserOptionsName = parserName
         , parserOptionsBaseFileName = baseFileName
@@ -135,4 +136,7 @@ wrap n m =
     (tell . map (("Error in "<>n<>": ")<>))
 
 writeFiles :: [(FilePath, Text)] -> MyMonadT IO ()
-writeFiles = mapM_ (lift . lift . lift . uncurry T.writeFile)
+writeFiles = mapM_ (lift . uncurry writeFile')
+  where
+  writeFile' :: FilePath -> Text -> IO ()
+  writeFile' fp = BS.writeFile fp . encodeUtf8

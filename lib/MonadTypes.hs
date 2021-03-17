@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module MonadTypes (
     module MonadTypes
   , throwError
@@ -18,14 +20,18 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import Grammar.Parse
 
-type MyMonadT m a = StateT [(Symbol,Type)] (ExceptT [Text] (WriterT [Text] m)) a
+newtype MyMonadT m a = MyMonadT { unMyMonadT :: StateT [(Symbol,Type)] (ExceptT [Text] (WriterT [Text] m)) a }
+  deriving  (Functor, Applicative, Monad, MonadError [Text], MonadWriter [Text], MonadState [(Symbol,Type)])
 type MyMonad a = MyMonadT Identity a
 
+instance MonadTrans MyMonadT where
+  lift = MyMonadT . lift . lift . lift
+
 runInIO :: MyMonadT IO () -> IO ()
-runInIO = (>>= output) . runWriterT . runExceptT . flip evalStateT []
+runInIO = (>>= output) . runWriterT . runExceptT . flip evalStateT [] . unMyMonadT
   where output (eitherErrorResult, warning) = do
           mapM_ T.putStrLn warning
           either (T.putStrLn . T.unlines) return eitherErrorResult
 
 runMyMonad :: MyMonad a -> (Either [Text] a, [Text])
-runMyMonad = runIdentity . runWriterT . runExceptT . flip evalStateT []
+runMyMonad = runIdentity . runWriterT . runExceptT . flip evalStateT [] . unMyMonadT
