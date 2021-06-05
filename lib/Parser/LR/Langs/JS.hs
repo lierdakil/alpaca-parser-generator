@@ -46,27 +46,25 @@ const GOTO = [
   ]
 
 class #{name}#{topInh gtop} {
-  constructor(lex, debug=false) {
-    this.lex = lex
+  constructor(debug=false) {
     this.debug = debug
-    this.stack = []
   }
 
-  _top() {
-    if (this.stack.length > 0) return this.stack[this.stack.length-1][0]
-    else return 0
-  }
-
-  parse() {
-    let a = this.lex.getNextToken()
+  parse(tokens) {
+    const stack = []
+    function top() {
+      if (stack.length > 0) return stack[stack.length-1][0]
+      else return 0
+    }
+    let a = tokens.next().value
     while(true) {
-      const action = Action[this._top()][a[0]]
+      const action = Action[top()][a[0]]
       switch(action) {
       #{indent 3 $ T.intercalate "\n" actionCases}
       default:
         if (this.debug) console.log(`Shift to ${action}`)
-        this.stack.push([action, a[1]])
-        a=this.lex.getNextToken()
+        stack.push([action, a[1]])
+        a=tokens.next().value
       }
     }
   }
@@ -109,30 +107,30 @@ module.exports = {#{name}}
       break
     }|] :: Maybe Text
     actionBody Reject = [interp|
-      const lastSt = this._top()
+      const lastSt = top()
       const parsed = [stateToString(lastSt)]
-      while (this.stack.length > 0) {
-        this.stack.pop()
-        parsed.unshift(stateToString(this._top()))
+      while (stack.length > 0) {
+        stack.pop()
+        parsed.unshift(stateToString(top()))
       }
       throw new Error(
         `Rejection state reached after parsing "${parsed.join(' ')}", when encoutered symbol "${tokToStr(a[0])}" in state ${lastSt}. Expected "${expectedSym(lastSt)}"`)
       |] :: Text
     actionBody (Shift _) = error "does not happen"
     actionBody (Reduce ((ExtendedStartRule, _), _)) = [interp|
-      this.stack.pop()
-      return this.stack.pop()[1]
+      stack.pop()
+      return stack.pop()[1]
       |]
     actionBody (Reduce ((h, body), mcode)) = [interp|
       if (this.debug) console.log("Reduce using #{h} -> #{showBody body}")
       #{T.intercalate "\n" (reverse $ zipWith showArg body [1::Word ..])}
-      const gt = GOTO[this._top()][#{tshow (nonTermIdx (NonTerm h))}] // #{h}
+      const gt = GOTO[top()][#{tshow (nonTermIdx (NonTerm h))}] // #{h}
       if (gt===0) throw new Exception("No goto")
       if (this.debug) {
-        console.log(`${this._top()} is now on top of the stack`)
+        console.log(`${top()} is now on top of the stack`)
         console.log(`${gt} will be placed on the stack`)
       }
-      this.stack.push([gt,(#{result})])
+      stack.push([gt,(#{result})])
       |]
       where
         result :: Text
@@ -141,7 +139,7 @@ module.exports = {#{name}}
           = T.strip code
           | otherwise
           = "null"
-        showArg _ i = [interp|const _#{i} = this.stack.pop()[1]|]
+        showArg _ i = [interp|const _#{i} = stack.pop()[1]|]
     nonTermIdx nt = fromJust $ M.lookup nt nonTerminalsMap
     nonTerminalsMap = M.fromList $ zip nonTerminals [0::Word ..]
     quote x = "\"" <> x <> "\""
