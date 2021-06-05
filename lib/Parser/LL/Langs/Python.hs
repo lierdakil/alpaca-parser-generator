@@ -37,29 +37,28 @@ class #{className}#{topInh gtop}:
         self.debug = debug
 
     def parse(self, tokens):
-        self.lex = tokens
-        self.stack = deque()
-        self.resultStack = deque()
-        self.stack.append(#{encodeSymbol llStartSymbol})
-        a = next(self.lex)
-        while len(self.stack) > 0:
-            X = self.stack.pop()
+        stack = deque()
+        resultStack = deque()
+        stack.append(#{encodeSymbol llStartSymbol})
+        a = next(tokens)
+        while len(stack) > 0:
+            X = stack.pop()
             if isinstance(X, TokenType):
                 if a[0] == X:
-                    self.resultStack.append(a)
-                    a = next(self.lex)
+                    resultStack.append(a)
+                    a = next(tokens)
                 else:
                     raise Exception(f"Found terminal {a[0].name} but expected {X.name}.")
             elif isinstance(X,NonTerminal):
                 trans = self.M[int(X)][int(a[0])]
-                self.stack.append(trans)
+                stack.append(trans)
                 if trans == 0:
                     raise Exception(f"No transition for {X.name}, {a[0].name}")
                 #{indent 4 $ T.intercalate "\n" bodies}
             elif isinstance(X, int):
                 #{indent 4 $ T.intercalate "\nel" actions}
 
-        return self.resultStack.pop()
+        return resultStack.pop()
 |]
     indent = indentLang 4
     nonTermDefs = zipWith nonTermDef [(0::Word) ..] nonTerms
@@ -83,11 +82,11 @@ class #{className}#{topInh gtop}:
           #{indent 1 . T.intercalate "\n" $ map pushSymbol (reverse b)}
       |] :: Text
     makeBody _ _ = error "Should never happen"
-    pushSymbol s = [interp|self.stack.append(#{encodeSymbol s})|] :: Text
+    pushSymbol s = [interp|stack.append(#{encodeSymbol s})|] :: Text
     makeAction ((_, body), mcode) n = [interp|
       if X == #{showIdx n}:
           #{indent 1 $ T.intercalate "\n" (reverse $ zipWith showArg body [1::Word ..])}
-          self.resultStack.append(#{act})
+          resultStack.append(#{act})
       |] :: Text
       where
         act :: Text
@@ -95,8 +94,8 @@ class #{className}#{topInh gtop}:
             = [interp|(#{code})|]
             | otherwise
             = "None"
-        showArg (NonTerm _) i = [interp|_#{tshow i}=self.resultStack.pop()|]
-        showArg _ i = [interp|_#{tshow i}=self.resultStack.pop()[1]|]
+        showArg (NonTerm _) i = [interp|_#{tshow i}=resultStack.pop()|]
+        showArg _ i = [interp|_#{tshow i}=resultStack.pop()[1]|]
 
 encodeSymbol :: Symbol -> Text
 encodeSymbol (NonTerm nt) = "NonTerminal.NT_" <> nt

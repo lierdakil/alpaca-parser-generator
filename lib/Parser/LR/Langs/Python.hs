@@ -45,22 +45,21 @@ class #{name}#{topInh gtop}:
         ]
     def __init__(self, debug=False):
         self.debug = debug
-    def top(self):
-        if len(self.stack)>0:
-            return self.stack[-1][0]
-        else:
-            return 0
     def parse(self, tokens):
-        self.lex = tokens
-        self.stack = deque()
-        a = next(self.lex)
+        stack = deque()
+        def top():
+            if len(stack)>0:
+                return stack[-1][0]
+            else:
+                return 0
+        a = next(tokens)
         while True:
-            action = self.Action[self.top()][int(a[0])]
+            action = self.Action[top()][int(a[0])]
             #{indent 3 $ T.intercalate "\nel" actionCases}
             else:
                 if self.debug: print(f"Shift to {action}")
-                self.stack.append((action, a))
-                a=next(self.lex)
+                stack.append((action, a))
+                a=next(tokens)
 |])]
     where
     base = parserOptionsBaseFileName
@@ -96,28 +95,28 @@ class #{name}#{topInh gtop}:
         #{indent 1 $ actionBody a}
     |] :: Maybe Text
     actionBody Reject = [interp|
-      lastSt = self.top()
+      lastSt = top()
       parsed=stateToString(lastSt)
-      while len(self.stack) > 0:
-          self.stack.pop()
-          parsed = stateToString(self.top()) + " " + parsed
+      while len(stack) > 0:
+          stack.pop()
+          parsed = stateToString(top()) + " " + parsed
       raise Exception(
         f'Rejection state reached after parsing "{parsed}", when encoutered symbol "{a[0].name}" in state {lastSt}. Expected "{expectedSym(lastSt)}"')
       |] :: Text
     actionBody (Shift _) = error "does not happen"
     actionBody (Reduce ((ExtendedStartRule, _), _)) = [interp|
-      self.stack.pop()
-      return self.stack.pop()[1]
+      stack.pop()
+      return stack.pop()[1]
       |]
     actionBody (Reduce ((h, body), mcode)) = [interp|
       if self.debug: print("Reduce using #{h} -> #{showBody body}")
       #{T.intercalate "\n" (reverse $ zipWith showArg body [1::Word ..])}
-      gt = self.GOTO[self.top()][#{tshow (nonTermIdx (NonTerm h))}] \# #{h}
+      gt = self.GOTO[top()][#{tshow (nonTermIdx (NonTerm h))}] \# #{h}
       if gt==0: raise Exception("No goto")
       if self.debug:
-          print(f'{self.top()} is now on top of the stack;')
+          print(f'{top()} is now on top of the stack;')
           print(f'{gt} will be placed on the stack')
-      self.stack.append((gt,(#{result})))
+      stack.append((gt,(#{result})))
       |]
       where
         result :: Text
@@ -126,8 +125,8 @@ class #{name}#{topInh gtop}:
           = T.strip code
           | otherwise
           = "None"
-        showArg (NonTerm _) i = [interp|_#{i} = self.stack.pop()[1]|]
-        showArg _ i = [interp|_#{i} = self.stack.pop()[1][1]|]
+        showArg (NonTerm _) i = [interp|_#{i} = stack.pop()[1]|]
+        showArg _ i = [interp|_#{i} = stack.pop()[1][1]|]
     nonTermIdx nt = fromJust $ M.lookup nt nonTerminalsMap
     nonTerminalsMap = M.fromList $ zip nonTerminals [0::Word ..]
     quote x = "\"" <> x <> "\""
