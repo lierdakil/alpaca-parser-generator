@@ -45,28 +45,27 @@ const M = [
 ];
 
 class #{className}#{topInh gtop} {
-  constructor(lex, debug = false) {
-    this.lex = lex
+  constructor(debug = false) {
     this.debug = debug
-    this.stack = []
-    this.resultStack = []
   }
 
-  parse() {
-    this.stack.push(#{encodeSymbol llStartSymbol})
-    let a = this.lex.getNextToken()
-    while (this.stack.length > 0) {
-      const [T, X] = this.stack.pop();
+  parse(tokens) {
+    const stack = []
+    const resultStack = []
+    stack.push(#{encodeSymbol llStartSymbol})
+    let a = tokens.next().value
+    while (stack.length > 0) {
+      const [T, X] = stack.pop();
       if (T === token) {
         if (a[0] === X) {
-          this.resultStack.push(a[1])
-          a = this.lex.getNextToken()
+          resultStack.push(a[1])
+          a = tokens.next().value
         } else {
           throw new Error(`Found terminal ${tokToStr(a[0])} but expected ${tokToStr(X)}.`)
         }
       } else if (T === nonterminal) {
         const trans = M[X][a[0]]
-        this.stack.push([action, trans])
+        stack.push([action, trans])
         switch(trans) {
         case 0:
           throw new Error(`No transition for ${nonTermToStr(X)}, ${tokToStr(a[0])}`)
@@ -79,7 +78,7 @@ class #{className}#{topInh gtop} {
       }
     }
 
-    return this.resultStack.pop()
+    return resultStack.pop()
   }
 }
 
@@ -110,11 +109,11 @@ module.exports = {#{className}}
         break
       |] :: Text
     makeBody _ _ = error "Should never happen"
-    pushSymbol s = [interp|this.stack.push(#{encodeSymbol s})|] :: Text
+    pushSymbol s = [interp|stack.push(#{encodeSymbol s})|] :: Text
     makeAction ((_, body), mcode) n = [interp|
       case #{showIdx n}: {
         #{indent 1 $ T.intercalate "\n" (reverse $ zipWith showArg body [1::Word ..])}
-        this.resultStack.push(#{act})
+        resultStack.push(#{act})
         break
       }|] :: Text
       where
@@ -123,7 +122,7 @@ module.exports = {#{className}}
             = [interp|(#{code})|]
             | otherwise
             = "null"
-        showArg _ i = [interp|const _#{tshow i}=this.resultStack.pop()|]
+        showArg _ i = [interp|const _#{tshow i}=resultStack.pop()|]
 
 encodeSymbol :: Symbol -> Text
 encodeSymbol (NonTerm nt) = [interp|[nonterminal, NonTerminal.NT_#{nt}]|]

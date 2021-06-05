@@ -28,51 +28,87 @@ function tokToStr(x) {
   }
 }
 
-class Lexer {
-  constructor(input, debug = false) {
-    this.input = input
-    this.curChIx = 0
-    this.debug = debug
+class Buf {
+  constructor(it) {
+    this.current = it[Symbol.iterator]()
+    this.stack = []
   }
 
-  getNextToken() {
-    let lastAccChIx = this.curChIx
-    const startChIx = this.curChIx
+  [Symbol.iterator]() {
+    return this
+  }
+
+  next() {
+    if (this.current === null) {
+      return {done: true}
+    }
+    const res = this.current.next()
+    if (res.done) {
+      if (this.stack.length) {
+        this.current = this.stack.pop()
+        return this.next()
+      } else {
+        this.current = null
+      }
+    }
+    return res
+  }
+
+  empty() {
+    return this.current === null
+  }
+
+  unshift(it) {
+    this.stack.push(this.current)
+    this.current = it[Symbol.iterator]()
+  }
+}
+
+function *lex(input, debug = false) {
+  const inputBuf = new Buf(input)
+
+  while(true) {
     let curCh = '\\0'
     let accSt = -1
     let curSt = 0
+    let buf = ""
+    let tmp = ""
     while (curSt >= 0) {
       if ([#{T.intercalate "," $ map (tshow . fst) accSt}].includes(curSt)) {
-        lastAccChIx = this.curChIx
+        buf += tmp
+        tmp = ""
         accSt = curSt
       }
       if ([#{T.intercalate "," nonGreedyStates}].includes(curSt)) {
         break
       }
-      if (this.curChIx >= this.input.length) break
-      curCh = this.input[this.curChIx]
-      this.curChIx+=1
+      const t = inputBuf.next()
+      if (t.done) break
+      curCh = t.value
+      tmp += curCh
       switch(curSt) {
       #{indent 3 transTable}
       }
       break
     }
 
-    const lastReadChIx = this.curChIx
-    this.curChIx = lastAccChIx
-    const text = this.input.substring(startChIx, lastAccChIx)
+    if (tmp.length > 0) {
+      inputBuf.unshift(tmp)
+    }
+    const text = buf
     switch(accSt) {
       #{indent 3 returnResult}
     }
-    if (this.curChIx >= this.input.length) {
-      if (this.debug) console.log(`Got EOF while lexing "${text}"`)
-      return [TokenType.eof, null]
+    if (inputBuf.empty()) {
+      if (debug) console.log(`Got EOF while lexing "${text}"`)
+      yield [TokenType.eof, null]
+      continue
     }
-    throw new Error("Unexpected input: " + this.input.substring(startChIx, lastReadChIx))
+    throw new Error("Unexpected input: " + buf + tmp)
   }
 }
 
-module.exports = {TokenType, tokToStr, Lexer}
+module.exports = {TokenType, tokToStr, lex}
 |])]
     where
     indent = indentLang 2
@@ -83,13 +119,14 @@ module.exports = {TokenType, tokToStr, Lexer}
     returnResult1 :: (Int, StateData) -> Text
     returnResult1 (st, StateData{saName=Just name, saAct=act}) = [interp|
       case #{st}:
-        if (this.debug) console.log("Lexed token #{name}: \\"" + text + "\\"")
-        return [TokenType.Tok_#{name}, #{mkAct act}]
+        if (debug) console.log("Lexed token #{name}: \\"" + text + "\\"")
+        yield [TokenType.Tok_#{name}, #{mkAct act}]
+        continue
       |]
     returnResult1 (st, StateData{saName=Nothing}) = [interp|
       case #{st}:
-        if (this.debug) console.log("Skipping state #{tshow st}: \\"" + text + "\\"")
-        return this.getNextToken()
+        if (debug) console.log("Skipping state #{tshow st}: \\"" + text + "\\"")
+        continue
       |]
     checkState :: (Int, (a, [(NE.NonEmpty CharPattern, Int)])) -> Maybe Text
     checkState (_, (_, [])) = Nothing

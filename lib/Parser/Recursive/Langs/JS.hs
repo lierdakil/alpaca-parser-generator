@@ -27,13 +27,13 @@ instance ParserWriter RecursiveParser JS where
 const {tokToStr, TokenType} = require('./lexer.js')
 #{topTop gtop}
 class #{parserOptionsName}#{topInh gtop} {
-  constructor(lexer, debug = false) {
-    this.lex = lexer
+  constructor(debug = false) {
     this.debug = debug
-    this.curTok = this.lex.getNextToken()
   }
 
-  parse() {
+  parse(tokens) {
+    this.tokens = tokens
+    this.curTok = this.tokens.next().value
     return this._parse_#{recursiveParserStartRule}()
   }
 
@@ -112,5 +112,5 @@ module.exports = {#{parserOptionsName}}
           throw new Error("Expected token #{tok s'}, but got " + tokToStr(this.curTok[0]))
         }
         const _#{n} = this.curTok[1]
-        this.curTok = this.lex.getNextToken()
+        this.curTok = this.tokens.next().value
         |]
