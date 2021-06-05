@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.33.0.
+-- This file has been generated from package.yaml by hpack version 0.34.4.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 671718791caa3a54b6362046a1dde35768f749d75d2de54d4340a100b51b5e31
+-- hash: c49ae6a6511380052f9dcc58fa96c3323e39add7a2c73ad4ad03a144ac4ca9ee
 
 name:           alpaca-parser-generator
 version:        0.2.1.1
@@ -60,7 +60,7 @@ executable alpaca
       Utils
       Paths_alpaca_parser_generator
   hs-source-dirs:
-      ./.
+      ./
       lib
   build-depends:
       array >=0.5.3 && <0.6
