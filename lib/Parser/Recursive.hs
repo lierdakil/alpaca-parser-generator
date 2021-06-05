@@ -6,10 +6,10 @@ module Parser.Recursive (
 
 import Parser.Types
 import Parser.Recursive.Build
-import Parser.Recursive.CPP()
-import Parser.Recursive.Python()
-import Parser.Recursive.JS()
-import Parser.Recursive.CSharp()
+import Parser.Recursive.Langs.CPP()
+import Parser.Recursive.Langs.Python()
+import Parser.Recursive.Langs.JS()
+import Parser.Recursive.Langs.CSharp()
 import Data.Proxy
 
 recursiveParser :: Proxy RecursiveParser

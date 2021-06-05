@@ -4,7 +4,7 @@
   , MultiParamTypeClasses
   , FlexibleContexts
   #-}
-module Parser.LR.CSharp () where
+module Parser.LR.Langs.JS () where
 
 import Parser.LR.Build
 import Lang
@@ -20,61 +20,68 @@ import Parser.LR.Point
 import Parser.Types
 import Control.Arrow
 
-instance LRPoint p => ParserWriter (LRParser p) CSharp where
+instance LRPoint p => ParserWriter (LRParser p) JS where
   --writeParser :: Proxy lang -> Text -> ParserOptions a -> parser -> [(FilePath,Text)]
   writeParser _ gtop ParserOptions{..} LRParser{..} = [
-      (base <> ".cs", [interp|
-using lexer;
-using System;
-using System.Collections.Generic;
-#{topTop gtop}
-namespace parser {
-public class #{className}#{topInh gtop} {
-  private readonly Lexer lex;
-  private readonly bool debug;
-  private Stack<(uint state, dynamic value)> stack = new Stack<(uint state, dynamic value)>();
-  private static uint[,] Action = new uint[,] {
-    #{indent 2 actionTable}
-  };
-  private static uint[,] GOTO = new uint[,] {
-    #{indent 2 gotoTable}
-  };
-  private uint top() {
-    return stack.Count == 0 ? 0 : stack.Peek().state;
-  }
-  static string[] stateNames = new string[] {#{stateToString}};
-  static string[] expectedSyms = new string[] {#{expectedSym}};
+      (base <> ".js", [interp|
+'use strict'
 
-  public #{className}(Lexer lex, bool debug = false) {
-    this.lex = lex;
-    this.debug = debug;
+const {TokenType, tokToStr} = require('./lexer.js')
+
+#{topTop gtop}
+
+function stateToString(state) {
+  return [ #{stateToString} ][state]
+}
+
+function expectedSym(state) {
+  return [ #{expectedSym} ][state]
+}
+
+const Action = [
+  #{indent 1 actionTable}
+  ]
+const GOTO = [
+  #{indent 1 gotoTable}
+  ]
+
+class #{name}#{topInh gtop} {
+  constructor(lex, debug=false) {
+    this.lex = lex
+    this.debug = debug
+    this.stack = []
   }
-  public dynamic parse() {
-    var a = lex.getNextToken();
-    while (true) {
-      var action = Action[top(), (int)a.type];
-      switch (action) {
-      #{indent 3 actionCases}
+
+  _top() {
+    if (this.stack.length > 0) return this.stack[this.stack.length-1][0]
+    else return 0
+  }
+
+  parse() {
+    let a = this.lex.getNextToken()
+    while(true) {
+      const action = Action[this._top()][a[0]]
+      switch(action) {
+      #{indent 3 $ T.intercalate "\n" actionCases}
       default:
-        if(debug) Console.Error.WriteLine($"Shift to {action}");
-        stack.Push((action, a));
-        a=lex.getNextToken();
-        break;
+        if (this.debug) console.log(`Shift to ${action}`)
+        this.stack.push([action, a[1]])
+        a=this.lex.getNextToken()
       }
     }
   }
 }
-}
+
+module.exports = {#{name}}
 |])]
     where
-    indent = indentLang 2
     base = parserOptionsBaseFileName
-    className = parserOptionsName
+    name = parserOptionsName
     tokens = lrTerminals
     states = lrStates
     nonTerminals = lrNonTerminals
     braces :: Text -> Text
-    braces x = "{"<>x<>"}"
+    braces x = "["<>x<>"]"
     actionTable = T.intercalate ",\n" $ map (braces . T.intercalate "," . map tshow) actionTableRaw
     gotoTable = T.intercalate ",\n" $ map (braces . T.intercalate "," . map tshow) gotoTableRaw
     (actionTableRaw, (actionsMap, _)) = runState (mapM (forM tokens . actionCell) states) (M.empty, fromIntegral $ length states)
@@ -94,37 +101,38 @@ public class #{className}#{topInh gtop} {
             return i
     stateToString = T.intercalate "," $ "\".\"" : map (quote . showSymbol) (M.elems lrStateSym)
     expectedSym = T.intercalate "," $ map (quote . T.intercalate "/") $ M.elems lrExpected
-    actionCases = T.intercalate "\n" $ mapMaybe writeAction $ M.toList actionsMap
+    actionCases = mapMaybe writeAction $ M.toList actionsMap
     writeAction (Shift _, _) = Nothing
     writeAction (a, n) = Just [interp|
-    case #{n}: {
-        #{indent 2 $ actionBody a}
-      }
-    |] :: Maybe Text
+    case #{tshow n}: {
+      #{indent 1 $ actionBody a}
+      break
+    }|] :: Maybe Text
     actionBody Reject = [interp|
-      string parsed=stateNames[top()];
-      var lastSt = top();
-      while(stack.Count > 0) { stack.Pop(); parsed = stateNames[top()] + " " + parsed; }
-      throw new ApplicationException(
-        $"Rejection state reached after parsing \\"{parsed}\\", when encoutered symbol \\""
-        + $"\\"{a.type}\\" in state {lastSt}. Expected \\"{expectedSyms[lastSt]}\\"");
+      const lastSt = this._top()
+      const parsed = [stateToString(lastSt)]
+      while (this.stack.length > 0) {
+        this.stack.pop()
+        parsed.unshift(stateToString(this._top()))
+      }
+      throw new Error(
+        `Rejection state reached after parsing "${parsed.join(' ')}", when encoutered symbol "${tokToStr(a[0])}" in state ${lastSt}. Expected "${expectedSym(lastSt)}"`)
       |] :: Text
     actionBody (Shift _) = error "does not happen"
     actionBody (Reduce ((ExtendedStartRule, _), _)) = [interp|
-      stack.Pop();
-      return stack.Pop().value;
+      this.stack.pop()
+      return this.stack.pop()[1]
       |]
     actionBody (Reduce ((h, body), mcode)) = [interp|
-      if(debug) Console.Error.WriteLine("Reduce using #{h} -> #{showBody body}");
+      if (this.debug) console.log("Reduce using #{h} -> #{showBody body}")
       #{T.intercalate "\n" (reverse $ zipWith showArg body [1::Word ..])}
-      var gt = GOTO[top(), #{tshow (nonTermIdx (NonTerm h))} /*#{h}*/];
-      if(gt==0) throw new ApplicationException("No goto");
-      if(debug) {
-        Console.Error.WriteLine($"{top()} is now on top of the stack;");
-        Console.Error.WriteLine($"{gt} will be placed on the stack");
+      const gt = GOTO[this._top()][#{tshow (nonTermIdx (NonTerm h))}] // #{h}
+      if (gt===0) throw new Exception("No goto")
+      if (this.debug) {
+        console.log(`${this._top()} is now on top of the stack`)
+        console.log(`${gt} will be placed on the stack`)
       }
-      stack.Push((gt,(#{result})));
-      break;
+      this.stack.push([gt,(#{result})])
       |]
       where
         result :: Text
@@ -133,10 +141,8 @@ public class #{className}#{topInh gtop} {
           = T.strip code
           | otherwise
           = "null"
-        showArg (NonTerm _) i =
-          [interp|dynamic _#{i}=stack.Pop().value;|]
-        showArg _ i =
-          [interp|var _#{i}=stack.Pop().value.Item2;|]
+        showArg _ i = [interp|const _#{i} = this.stack.pop()[1]|]
     nonTermIdx nt = fromJust $ M.lookup nt nonTerminalsMap
     nonTerminalsMap = M.fromList $ zip nonTerminals [0::Word ..]
     quote x = "\"" <> x <> "\""
+    indent = indentLang 2

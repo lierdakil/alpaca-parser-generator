@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 {-# LANGUAGE QuasiQuotes, OverloadedStrings, FlexibleContexts #-}
-module Lexer.CSharp() where
+module Lexer.Langs.CSharp() where
 
 import qualified Data.IntMap as IM
 import qualified Data.List.NonEmpty as NE

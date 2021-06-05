@@ -4,7 +4,7 @@
   , MultiParamTypeClasses
   , FlexibleContexts
   #-}
-module Parser.LL.JS () where
+module Parser.LL.Langs.JS () where
 
 import Parser.Types
 import Utils

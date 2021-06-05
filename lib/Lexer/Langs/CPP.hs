@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 {-# LANGUAGE QuasiQuotes, OverloadedStrings, FlexibleContexts #-}
-module Lexer.CPP() where
+module Lexer.Langs.CPP() where
 
 import qualified Data.IntMap as IM
 import qualified Data.Map as M

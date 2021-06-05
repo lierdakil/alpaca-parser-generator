@@ -3,7 +3,7 @@
   , RecordWildCards
   , MultiParamTypeClasses
   #-}
-module Parser.Recursive.CPP () where
+module Parser.Recursive.Langs.CPP () where
 
 import Grammar
 

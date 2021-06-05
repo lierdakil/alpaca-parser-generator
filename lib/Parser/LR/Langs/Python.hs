@@ -4,7 +4,7 @@
   , MultiParamTypeClasses
   , FlexibleContexts
   #-}
-module Parser.LR.JS () where
+module Parser.LR.Langs.Python () where
 
 import Parser.LR.Build
 import Lang
@@ -20,59 +20,47 @@ import Parser.LR.Point
 import Parser.Types
 import Control.Arrow
 
-instance LRPoint p => ParserWriter (LRParser p) JS where
+instance LRPoint p => ParserWriter (LRParser p) Python where
   --writeParser :: Proxy lang -> Text -> ParserOptions a -> parser -> [(FilePath,Text)]
   writeParser _ gtop ParserOptions{..} LRParser{..} = [
-      (base <> ".js", [interp|
-'use strict'
-
-const {TokenType, tokToStr} = require('./lexer.js')
+      (base <> ".py", [interp|
+from lexer import *
+from enum import IntEnum
+from collections import deque
 
 #{topTop gtop}
 
-function stateToString(state) {
+def stateToString(state):
   return [ #{stateToString} ][state]
-}
 
-function expectedSym(state) {
+def expectedSym(state):
   return [ #{expectedSym} ][state]
-}
 
-const Action = [
-  #{indent 1 actionTable}
-  ]
-const GOTO = [
-  #{indent 1 gotoTable}
-  ]
-
-class #{name}#{topInh gtop} {
-  constructor(lex, debug=false) {
-    this.lex = lex
-    this.debug = debug
-    this.stack = []
-  }
-
-  _top() {
-    if (this.stack.length > 0) return this.stack[this.stack.length-1][0]
-    else return 0
-  }
-
-  parse() {
-    let a = this.lex.getNextToken()
-    while(true) {
-      const action = Action[this._top()][a[0]]
-      switch(action) {
-      #{indent 3 $ T.intercalate "\n" actionCases}
-      default:
-        if (this.debug) console.log(`Shift to ${action}`)
-        this.stack.push([action, a[1]])
-        a=this.lex.getNextToken()
-      }
-    }
-  }
-}
-
-module.exports = {#{name}}
+class #{name}#{topInh gtop}:
+    Action = [
+        #{indent 2 actionTable}
+        ]
+    GOTO = [
+        #{indent 2 gotoTable}
+        ]
+    def __init__(self, debug=False):
+        self.debug = debug
+    def top(self):
+        if len(self.stack)>0:
+            return self.stack[-1][0]
+        else:
+            return 0
+    def parse(self, tokens):
+        self.lex = tokens
+        self.stack = deque()
+        a = next(self.lex)
+        while True:
+            action = self.Action[self.top()][int(a[0])]
+            #{indent 3 $ T.intercalate "\nel" actionCases}
+            else:
+                if self.debug: print(f"Shift to {action}")
+                self.stack.append((action, a))
+                a=next(self.lex)
 |])]
     where
     base = parserOptionsBaseFileName
@@ -104,35 +92,32 @@ module.exports = {#{name}}
     actionCases = mapMaybe writeAction $ M.toList actionsMap
     writeAction (Shift _, _) = Nothing
     writeAction (a, n) = Just [interp|
-    case #{tshow n}: {
-      #{indent 1 $ actionBody a}
-      break
-    }|] :: Maybe Text
+    if action == #{tshow n}:
+        #{indent 1 $ actionBody a}
+    |] :: Maybe Text
     actionBody Reject = [interp|
-      const lastSt = this._top()
-      const parsed = [stateToString(lastSt)]
-      while (this.stack.length > 0) {
-        this.stack.pop()
-        parsed.unshift(stateToString(this._top()))
-      }
-      throw new Error(
-        `Rejection state reached after parsing "${parsed.join(' ')}", when encoutered symbol "${tokToStr(a[0])}" in state ${lastSt}. Expected "${expectedSym(lastSt)}"`)
+      lastSt = self.top()
+      parsed=stateToString(lastSt)
+      while len(self.stack) > 0:
+          self.stack.pop()
+          parsed = stateToString(self.top()) + " " + parsed
+      raise Exception(
+        f'Rejection state reached after parsing "{parsed}", when encoutered symbol "{a[0].name}" in state {lastSt}. Expected "{expectedSym(lastSt)}"')
       |] :: Text
     actionBody (Shift _) = error "does not happen"
     actionBody (Reduce ((ExtendedStartRule, _), _)) = [interp|
-      this.stack.pop()
-      return this.stack.pop()[1]
+      self.stack.pop()
+      return self.stack.pop()[1]
       |]
     actionBody (Reduce ((h, body), mcode)) = [interp|
-      if (this.debug) console.log("Reduce using #{h} -> #{showBody body}")
+      if self.debug: print("Reduce using #{h} -> #{showBody body}")
       #{T.intercalate "\n" (reverse $ zipWith showArg body [1::Word ..])}
-      const gt = GOTO[this._top()][#{tshow (nonTermIdx (NonTerm h))}] // #{h}
-      if (gt===0) throw new Exception("No goto")
-      if (this.debug) {
-        console.log(`${this._top()} is now on top of the stack`)
-        console.log(`${gt} will be placed on the stack`)
-      }
-      this.stack.push([gt,(#{result})])
+      gt = self.GOTO[self.top()][#{tshow (nonTermIdx (NonTerm h))}] \# #{h}
+      if gt==0: raise Exception("No goto")
+      if self.debug:
+          print(f'{self.top()} is now on top of the stack;')
+          print(f'{gt} will be placed on the stack')
+      self.stack.append((gt,(#{result})))
       |]
       where
         result :: Text
@@ -140,9 +125,10 @@ module.exports = {#{name}}
           | Just code <- mcode
           = T.strip code
           | otherwise
-          = "null"
-        showArg _ i = [interp|const _#{i} = this.stack.pop()[1]|]
+          = "None"
+        showArg (NonTerm _) i = [interp|_#{i} = self.stack.pop()[1]|]
+        showArg _ i = [interp|_#{i} = self.stack.pop()[1][1]|]
     nonTermIdx nt = fromJust $ M.lookup nt nonTerminalsMap
     nonTerminalsMap = M.fromList $ zip nonTerminals [0::Word ..]
     quote x = "\"" <> x <> "\""
-    indent = indentLang 2
+    indent = indentLang 4

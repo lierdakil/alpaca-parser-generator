@@ -6,8 +6,8 @@ module Lexer (
 
 import Lexer.Types
 import Lexer.Build
-import Lexer.CPP()
-import Lexer.CSharp()
-import Lexer.Python()
-import Lexer.JS()
+import Lexer.Langs.CPP()
+import Lexer.Langs.CSharp()
+import Lexer.Langs.Python()
+import Lexer.Langs.JS()
 import Lang

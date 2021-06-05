@@ -3,7 +3,7 @@
   , RecordWildCards
   , MultiParamTypeClasses
   #-}
-module Parser.Recursive.JS () where
+module Parser.Recursive.Langs.CSharp () where
 
 import Grammar
 
@@ -19,28 +19,29 @@ import Parser.Types
 import qualified Control.Arrow as A
 import Parser.Recursive.Build
 
-instance ParserWriter RecursiveParser JS where
+instance ParserWriter RecursiveParser CSharp where
+  --writeParser :: forall a. Proxy lang -> ParserOptions a -> parser -> [(FilePath,Text)]
   writeParser _ gtop ParserOptions{..} RecursiveParser{..} =
-    [(basename <> ".js", [interp|
-'use strict'
-
-const {tokToStr, TokenType} = require('./lexer.js')
+    [(basename <> ".cs", [interp|
+using lexer;
+using System;
 #{topTop gtop}
+namespace parser {
 class #{parserOptionsName}#{topInh gtop} {
-  constructor(lexer, debug = false) {
-    this.lex = lexer
-    this.debug = debug
-    this.curTok = this.lex.getNextToken()
-  }
-
-  parse() {
-    return this._parse_#{recursiveParserStartRule}()
-  }
-
+  private readonly Lexer lex;
+  private (TokenType type, dynamic attr) curTok;
+  private readonly bool debug;
   #{indent 1 $ T.intercalate "\n" parsers}
+  public #{parserOptionsName}(Lexer lex, bool debug = false) {
+    this.lex = lex;
+    this.debug = debug;
+    curTok = lex.getNextToken();
+  }
+  public dynamic parse() {
+    return parse_#{recursiveParserStartRule}();
+  }
 }
-
-module.exports = {#{parserOptionsName}}
+}
 |])]
     where
     RecursiveParserItem recursiveParserStartRule _ _ :| _ = recursiveParserParsers
@@ -49,52 +50,48 @@ module.exports = {#{parserOptionsName}}
     parsers :: [Text]
     parsers = map makeOneParser $ NE.toList recursiveParserParsers
 
-    printDebug :: Text -> Text
-    printDebug t = [interp|if (this.debug) console.log("#{t}")|]
-
     makeOneParser :: RecursiveParserItem -> Text
     makeOneParser RecursiveParserItem{..} = [interp|
-      _parse_#{recursiveParserItemHead}() {
-        #{indent 1 $ makeAlternatives recursiveParserItemHead recursiveParserItemAlternatives}
+      private dynamic parse_#{recursiveParserItemHead}() {
+        #{indent 1 $ makeAlternatives recursiveParserItemHead recursiveParserItemAlternatives }
       }
       |]
 
     makeAlternatives :: Text -> RecursiveParserItemAlternatives -> Text
     makeAlternatives _ (SingleBody b act) = makeBody b act
     makeAlternatives h (MultiBody alts) = [interp|
-      #{T.intercalate "\nelse " $ map (uncurry makeAlt) alts'}
-      else {
+      #{T.intercalate " else " $ map (uncurry makeAlt) alts'} else {
         #{indent 1 alt}
       }
       |] where alts' = map (A.first $ S.map fromJust) $ filter (all isJust . fst) alts
                alt | Just res <- find (S.member Nothing . fst) alts = uncurry makeBody (snd res)
                    | otherwise = [interp|
-                      throw new Error("No alternative matched while parsing nonterminal #{h}:" + tokToStr(this.curTok[0]));
+                        throw new ApplicationException($"No alternative matched while parsing nonterminal #{h}: {curTok.type}");
                       |]
 
     makeBody :: Body -> Maybe Text -> Text
     makeBody (Body debug syms) act = [interp|
-      #{printDebug debug}
+      if (debug) Console.Error.WriteLine("#{debug}");
       #{T.intercalate "\n" $ map (uncurry makeBodySym) $ zip [1::Word ..] syms}
       #{writeAction act}
       |]
 
+    writeAction :: Maybe Text -> Text
+    writeAction Nothing = ""
+    writeAction (Just a) = [interp|return #{T.strip a};|]
+
     makeAlt :: S.Set Symbol -> (Body, Maybe Text) -> Text
     makeAlt s (b, act) = [interp|
-        if (#{checkLookahead s}) {
-          #{indent 1 $ makeBody b act}
-        }
-        |]
+      if(#{checkLookahead s}){
+        #{indent 1 $ makeBody b act}
+      }
+      |]
 
     checkLookahead :: S.Set Symbol -> Text
     checkLookahead la = T.intercalate " || " $ map cond $ S.toList la
       where
         cond :: Symbol -> Text
-        cond s = [interp|this.curTok[0] === TokenType.#{tok s}|]
-
-    writeAction :: Maybe Text -> Text
-    writeAction Nothing = ""
-    writeAction (Just a) = [interp|return #{T.strip a}|]
+        cond s = [interp|curTok.type == TokenType.#{tok s}|]
 
     tok :: Symbol -> Text
     tok TermEof = "eof"
@@ -104,13 +101,12 @@ module.exports = {#{parserOptionsName}}
     makeBodySym :: Word -> (Symbol, RecursiveParserItemDoesReturn) -> Text
     makeBodySym n s = case s of
       (NonTerm nt, DoesReturnValue)
-        -> [interp|const _#{n} = this._parse_#{nt}()|]
+        -> [interp|dynamic _#{n} = parse_#{nt}();|]
       (NonTerm nt, DoesNotReturnValue)
-        -> [interp|this._parse_#{nt}()|]
+        -> [interp|parse_#{nt}();|]
       (s', _) -> [interp|
-        if (this.curTok[0] != TokenType.#{tok s'}) {
-          throw new Error("Expected token #{tok s'}, but got " + tokToStr(this.curTok[0]))
-        }
-        const _#{n} = this.curTok[1]
-        this.curTok = this.lex.getNextToken()
+        if(curTok.type != TokenType.#{tok s'})
+          throw new ApplicationException($"Expected token #{tok s'}, but got {curTok.type}");
+        var _#{n} = curTok.Item2;
+        curTok = lex.getNextToken();
         |]

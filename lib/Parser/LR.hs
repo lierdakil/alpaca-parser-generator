@@ -15,10 +15,10 @@ import Parser.LR.Point
 import Parser.LR.Build
 import Parser.LR.LALR
 import Parser.LR.SLR
-import Parser.LR.CPP()
-import Parser.LR.CSharp()
-import Parser.LR.Python()
-import Parser.LR.JS()
+import Parser.LR.Langs.CPP()
+import Parser.LR.Langs.CSharp()
+import Parser.LR.Langs.Python()
+import Parser.LR.Langs.JS()
 import Data.Proxy
 
 type LR1Parser = LRParser LR1Point

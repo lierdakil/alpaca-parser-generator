@@ -3,7 +3,7 @@
   , RecordWildCards
   , MultiParamTypeClasses
   #-}
-module Parser.Recursive.Python () where
+module Parser.Recursive.Langs.JS () where
 
 import Grammar
 
@@ -19,49 +19,57 @@ import Parser.Types
 import qualified Control.Arrow as A
 import Parser.Recursive.Build
 
-instance ParserWriter RecursiveParser Python where
-  --writeParser :: forall a. Proxy lang -> ParserOptions a -> parser -> [(FilePath,Text)]
+instance ParserWriter RecursiveParser JS where
   writeParser _ gtop ParserOptions{..} RecursiveParser{..} =
-    [(basename <> ".py", [interp|
-from lexer import TokenType
+    [(basename <> ".js", [interp|
+'use strict'
+
+const {tokToStr, TokenType} = require('./lexer.js')
 #{topTop gtop}
-class #{parserOptionsName}#{topInh gtop}:
-    def __init__(self, debug = False):
-        self.debug = debug
+class #{parserOptionsName}#{topInh gtop} {
+  constructor(lexer, debug = false) {
+    this.lex = lexer
+    this.debug = debug
+    this.curTok = this.lex.getNextToken()
+  }
 
-    #{indent 1 $ T.intercalate "\n" parsers}
+  parse() {
+    return this._parse_#{recursiveParserStartRule}()
+  }
 
-    def parse(self, tokens):
-        self.lex = tokens
-        self.curTok = next(self.lex)
-        return self.parse_#{recursiveParserStartRule}()
+  #{indent 1 $ T.intercalate "\n" parsers}
+}
+
+module.exports = {#{parserOptionsName}}
 |])]
     where
     RecursiveParserItem recursiveParserStartRule _ _ :| _ = recursiveParserParsers
     basename = parserOptionsBaseFileName
-    indent = indentLang 4
+    indent = indentLang 2
     parsers :: [Text]
     parsers = map makeOneParser $ NE.toList recursiveParserParsers
 
     printDebug :: Text -> Text
-    printDebug t = [interp|if self.debug: print("#{t}")|]
+    printDebug t = [interp|if (this.debug) console.log("#{t}")|]
 
     makeOneParser :: RecursiveParserItem -> Text
     makeOneParser RecursiveParserItem{..} = [interp|
-      def parse_#{recursiveParserItemHead}(self):
-          #{indent 1 $ makeAlternatives recursiveParserItemHead recursiveParserItemAlternatives}
+      _parse_#{recursiveParserItemHead}() {
+        #{indent 1 $ makeAlternatives recursiveParserItemHead recursiveParserItemAlternatives}
+      }
       |]
 
     makeAlternatives :: Text -> RecursiveParserItemAlternatives -> Text
     makeAlternatives _ (SingleBody b act) = makeBody b act
     makeAlternatives h (MultiBody alts) = [interp|
-      #{T.intercalate "\nel" $ map (uncurry makeAlt) alts'}
-      else:
-          #{indent 1 alt}
+      #{T.intercalate "\nelse " $ map (uncurry makeAlt) alts'}
+      else {
+        #{indent 1 alt}
+      }
       |] where alts' = map (A.first $ S.map fromJust) $ filter (all isJust . fst) alts
                alt | Just res <- find (S.member Nothing . fst) alts = uncurry makeBody (snd res)
                    | otherwise = [interp|
-                      raise Exception("No alternative matched while parsing nonterminal #{h}:" + str(self.curTok[0]));
+                      throw new Error("No alternative matched while parsing nonterminal #{h}:" + tokToStr(this.curTok[0]));
                       |]
 
     makeBody :: Body -> Maybe Text -> Text
@@ -73,19 +81,20 @@ class #{parserOptionsName}#{topInh gtop}:
 
     makeAlt :: S.Set Symbol -> (Body, Maybe Text) -> Text
     makeAlt s (b, act) = [interp|
-        if #{checkLookahead s}:
-            #{indent 1 $ makeBody b act}
+        if (#{checkLookahead s}) {
+          #{indent 1 $ makeBody b act}
+        }
         |]
 
     checkLookahead :: S.Set Symbol -> Text
-    checkLookahead la = T.intercalate " or " $ map cond $ S.toList la
+    checkLookahead la = T.intercalate " || " $ map cond $ S.toList la
       where
         cond :: Symbol -> Text
-        cond s = [interp|self.curTok[0] == TokenType.#{tok s}|]
+        cond s = [interp|this.curTok[0] === TokenType.#{tok s}|]
 
     writeAction :: Maybe Text -> Text
     writeAction Nothing = ""
-    writeAction (Just a) = [interp|return #{T.strip a};|]
+    writeAction (Just a) = [interp|return #{T.strip a}|]
 
     tok :: Symbol -> Text
     tok TermEof = "eof"
@@ -95,12 +104,13 @@ class #{parserOptionsName}#{topInh gtop}:
     makeBodySym :: Word -> (Symbol, RecursiveParserItemDoesReturn) -> Text
     makeBodySym n s = case s of
       (NonTerm nt, DoesReturnValue)
-        -> [interp|_#{n} = self.parse_#{nt}();|]
+        -> [interp|const _#{n} = this._parse_#{nt}()|]
       (NonTerm nt, DoesNotReturnValue)
-        -> [interp|self.parse_#{nt}();|]
+        -> [interp|this._parse_#{nt}()|]
       (s', _) -> [interp|
-        if self.curTok[0] != TokenType.#{tok s'}:
-            raise Exception("Expected token #{tok s'}, but got " + str(self.curTok[0]))
-        _#{n} = self.curTok[1]
-        self.curTok = next(self.lex)
+        if (this.curTok[0] != TokenType.#{tok s'}) {
+          throw new Error("Expected token #{tok s'}, but got " + tokToStr(this.curTok[0]))
+        }
+        const _#{n} = this.curTok[1]
+        this.curTok = this.lex.getNextToken()
         |]
