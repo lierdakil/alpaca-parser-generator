@@ -19,38 +19,69 @@ class TokenType(IntEnum):
     eof = 0
     #{indent 1 tokDefns}
 
-class Lexer:
-    def __init__(self, input, debug = False):
-        self.input = input
-        self.curChIx = 0
-        self.debug = debug
+class Buf:
+    def __init__(self, it):
+        self.current = iter(it)
+        self.stack = []
 
-    def getNextToken(self):
-        lastAccChIx = self.curChIx
-        startChIx = self.curChIx
-        curCh = '\\0'
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.current is None:
+            raise StopIteration
+        try:
+            return next(self.current)
+        except StopIteration:
+            if self.stack:
+                self.current = self.stack.pop()
+                return next(self)
+            else:
+                self.current = None
+                raise StopIteration
+
+    def __bool__(self):
+        return self.current is not None
+
+    def unshift(self, it):
+        self.stack.append(self.current)
+        self.current = iter(it)
+
+
+
+def lex(input, debug = False):
+    inputBuf = Buf(input)
+
+    while True:
+        curCh = None
         accSt = -1
         curSt = 0
+        buf = ""
+        tmp = ""
         while curSt >= 0:
             if curSt in [#{T.intercalate "," $ map (tshow . fst) accSt}]:
-                lastAccChIx = self.curChIx
+                buf += tmp
+                tmp = ""
                 accSt = curSt
             if curSt in [#{T.intercalate "," nonGreedyStates}]:
                 break
-            if self.curChIx >= len(self.input): break
-            curCh = self.input[self.curChIx]
-            self.curChIx+=1
+            try:
+                curCh = next(inputBuf)
+            except StopIteration:
+                break
+            tmp += curCh
             #{indent 3 transTable}
             break
 
-        lastReadChIx = self.curChIx
-        self.curChIx = lastAccChIx
-        text = self.input[startChIx:lastAccChIx]
+        if tmp:
+            inputBuf.unshift(tmp)
+        text = buf
         #{indent 2 returnResult}
-        if self.curChIx >= len(self.input):
-            if self.debug: print("Got EOF while lexing \\"" + text + "\\"")
-            return (TokenType.eof, None)
-        raise Exception("Unexpected input: " + self.input[startChIx:lastReadChIx])
+        if not inputBuf:
+            if debug: print("Got EOF while lexing \\"" + text + "\\"")
+            yield (TokenType.eof, None)
+            continue
+        raise Exception("Unexpected input: " + buf + tmp)
 |])]
     where
     indent = indentLang 4
@@ -61,13 +92,14 @@ class Lexer:
     returnResult1 :: (Int, StateData) -> Text
     returnResult1 (st, StateData{saName=Just name, saAct=act}) = [interp|
       if accSt == #{tshow st}:
-          if self.debug: print("Lexed token #{name}: \\"" + text + "\\"")
-          return (TokenType.Tok_#{name}, #{mkAct act})
+          if debug: print("Lexed token #{name}: \\"" + text + "\\"")
+          yield (TokenType.Tok_#{name}, #{mkAct act})
+          continue
       |]
     returnResult1 (st, StateData{saName=Nothing}) = [interp|
       if accSt == #{tshow st}:
-          if self.debug: print("Skipping state #{tshow st}: \\"" + text + "\\"")
-          return self.getNextToken()
+          if debug: print("Skipping state #{tshow st}: \\"" + text + "\\"")
+          continue
       |]
     checkState :: (Int, (a, [(NE.NonEmpty CharPattern, Int)])) -> Maybe Text
     checkState (_, (_, [])) = Nothing

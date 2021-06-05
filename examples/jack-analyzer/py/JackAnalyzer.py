@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from lexer import Lexer, TokenType
+from lexer import lex, TokenType
 from parser import Parser
 from sys import argv
 from parserTypes import escape
@@ -55,22 +55,22 @@ def analyzeFile(fn):
     print(f"<!-- Analyzing {fn} #-->")
     # Lexer part
     with open(fn) as f:
-        lex = Lexer(f.read(), debug)
-        tok, s = lex.getNextToken()
+        tokens = lex(f.read(), debug)
+        tok, s = next(tokens)
         print('<tokens>')
         while tok is not TokenType.eof:
             t = tokenClass[tok.name[4:]]
             if t == 'symbol':
                 s = escape(s)
             print(f'<{t}> {s} </{t}>')
-            tok, s = lex.getNextToken()
+            tok, s = next(tokens)
         print('</tokens>')
 
     # Parser part
     with open(fn) as f:
-        lex = Lexer(f.read(), debug)
-        parser = Parser(lex, debug)
-        expr = parser.parse()
+        tokens = lex(f.read(), debug)
+        parser = Parser(debug)
+        expr = parser.parse(tokens)
         res = "\n".join(filter(lambda x: len(x)>0, str(expr).split("\n")))
         print(res)
 

@@ -43,24 +43,24 @@ class #{name}#{topInh gtop}:
     GOTO = [
         #{indent 2 gotoTable}
         ]
-    def __init__(self, lex, debug=False):
-        self.lex = lex
+    def __init__(self, debug=False):
         self.debug = debug
-        self.stack = deque()
     def top(self):
         if len(self.stack)>0:
             return self.stack[-1][0]
         else:
             return 0
-    def parse(self):
-        a = self.lex.getNextToken()
+    def parse(self, tokens):
+        self.lex = tokens
+        self.stack = deque()
+        a = next(self.lex)
         while True:
             action = self.Action[self.top()][int(a[0])]
             #{indent 3 $ T.intercalate "\nel" actionCases}
             else:
                 if self.debug: print(f"Shift to {action}")
                 self.stack.append((action, a))
-                a=self.lex.getNextToken()
+                a=next(self.lex)
 |])]
     where
     base = parserOptionsBaseFileName

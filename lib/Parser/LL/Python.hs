@@ -33,21 +33,21 @@ class #{className}#{topInh gtop}:
     M = [
         #{indent 2 $ T.intercalate ",\n" $ map (braces . T.intercalate "," . map showIdx') transTable}
     ]
-    def __init__(self, lex, debug):
-        self.lex = lex
+    def __init__(self, debug):
         self.debug = debug
+
+    def parse(self, tokens):
+        self.lex = tokens
         self.stack = deque()
         self.resultStack = deque()
-
-    def parse(self):
         self.stack.append(#{encodeSymbol llStartSymbol})
-        a = self.lex.getNextToken()
+        a = next(self.lex)
         while len(self.stack) > 0:
             X = self.stack.pop()
             if isinstance(X, TokenType):
                 if a[0] == X:
                     self.resultStack.append(a)
-                    a = self.lex.getNextToken()
+                    a = next(self.lex)
                 else:
                     raise Exception(f"Found terminal {a[0].name} but expected {X.name}.")
             elif isinstance(X,NonTerminal):

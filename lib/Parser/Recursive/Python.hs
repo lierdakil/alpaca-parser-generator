@@ -26,14 +26,14 @@ instance ParserWriter RecursiveParser Python where
 from lexer import TokenType
 #{topTop gtop}
 class #{parserOptionsName}#{topInh gtop}:
-    def __init__(self, lexer, debug = False):
-        self.lex = lexer
+    def __init__(self, debug = False):
         self.debug = debug
-        self.curTok = self.lex.getNextToken()
 
     #{indent 1 $ T.intercalate "\n" parsers}
 
-    def parse(self):
+    def parse(self, tokens):
+        self.lex = tokens
+        self.curTok = next(self.lex)
         return self.parse_#{recursiveParserStartRule}()
 |])]
     where
@@ -102,5 +102,5 @@ class #{parserOptionsName}#{topInh gtop}:
         if self.curTok[0] != TokenType.#{tok s'}:
             raise Exception("Expected token #{tok s'}, but got " + str(self.curTok[0]))
         _#{n} = self.curTok[1]
-        self.curTok = self.lex.getNextToken()
+        self.curTok = next(self.lex)
         |]
