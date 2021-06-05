@@ -15,39 +15,78 @@ instance LexerWriter CSharp where
   writeLexer _ accSt tokNames stList =
     [ ("lexer.cs", [interp|
 using System;
+using System.Collections;
+using System.Collections.Generic;
 
 namespace lexer {
 public enum TokenType : uint {
   eof, #{T.intercalate "," (map (("Tok_"<>) . fst) tokNames)}
 }
-public class Lexer {
-  private readonly string input;
-  private readonly bool debug;
-  int curChIx;
-  public Lexer(string input, bool debug = false) {
-    this.input = input;
-    this.debug = debug;
-    curChIx = 0;
+
+class Buf<T> : IEnumerator<T> {
+  IEnumerator<T> current;
+  Stack<IEnumerator<T>> stack;
+
+  Object IEnumerator.Current => Current;
+  public T Current => Empty ? default(T) : current.Current;
+  public bool Empty => current is null;
+
+  public Buf(IEnumerable<T> it) {
+    current = it.GetEnumerator();
+    stack = new Stack<IEnumerator<T>>();
   }
-  public (TokenType type, dynamic attr) getNextToken() {
+
+  public bool MoveNext() {
+    if (Empty) return false;
+    var res = current.MoveNext();
+    if (!res) {
+      if (stack.Count > 0) {
+        current = stack.Pop();
+        return MoveNext();
+      } else {
+        current = null;
+      }
+    }
+    return res;
+  }
+
+  public void Unshift(IEnumerable<T> it) {
+    stack.Push(current);
+    current = it.GetEnumerator();
+  }
+
+  public void Reset() {
+    throw new NotSupportedException();
+  }
+
+  public void Dispose() {
+    /* no-op */
+  }
+}
+
+public class Lexer {
+  public static IEnumerable<(TokenType type, dynamic attr)> lex(IEnumerable<char> input, bool debug = false) {
+    var inputBuf = new Buf<char>(input);
     start:
-    var lastAccChIx = curChIx;
-    var startChIx = curChIx;
     char curCh;
     int accSt = -1;
+    string buf = "";
+    string tmp = "";
     #{indent 2 transTable}
     end:
-    var lastReadChIx = curChIx;
-    curChIx = lastAccChIx;
-    var text = input.Substring(startChIx, curChIx - startChIx);
+    if (tmp.Length > 0) {
+      inputBuf.Unshift(tmp);
+    }
+    var text = buf;
     switch(accSt){
       #{indent 3 returnResult}
     }
-    if (curChIx >= input.Length) {
+    if (inputBuf.Empty) {
       if (debug) Console.Error.WriteLine($"Got EOF while lexing \\"{text}\\"");
-      return (TokenType.eof, null);
+      yield return (TokenType.eof, null);
+      goto start;
     }
-    throw new ApplicationException("Unexpected input: " + input.Substring(startChIx, lastReadChIx-startChIx));
+    throw new ApplicationException("Unexpected input: " + buf + tmp);
   }
 }
 }
@@ -57,7 +96,8 @@ public class Lexer {
     accStS = IM.fromList accSt
     checkAccepting st
       | Just StateData{saGreed=greed} <- st `IM.lookup` accStS = [interp|
-        lastAccChIx = curChIx;
+        buf += tmp;
+        tmp = "";
         accSt = #{st};
         #{if greed == NonGreedy then "goto end;" else "" :: T.Text}
         |]
@@ -66,9 +106,9 @@ public class Lexer {
     checkState (curSt, (_, charTrans)) = [interp|
       state_#{curSt}:
         #{indent 1 $ checkAccepting curSt}
-        if(curChIx >= input.Length) goto end;
-        curCh = input[curChIx];
-        ++curChIx;
+        if(!inputBuf.MoveNext()) goto end;
+        curCh = inputBuf.Current;
+        tmp += curCh;
         #{indent 1 $ T.intercalate " else " $ map checkChars charTrans}
         goto end;
       |] :: Text
@@ -76,7 +116,8 @@ public class Lexer {
     returnResult1 (st, StateData{saName=Just name, saAct=act}) = [interp|
       case #{st}:
         if (debug) Console.Error.WriteLine($"Lexed token #{name}: \\"{text}\\"");
-        return (TokenType.Tok_#{name}, #{mkAct act});
+        yield return (TokenType.Tok_#{name}, #{mkAct act});
+        goto start;
       |] :: Text
     returnResult1 (st, StateData{saName=Nothing}) = [interp|
       case #{st}:

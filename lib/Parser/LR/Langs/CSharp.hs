@@ -30,7 +30,6 @@ using System.Collections.Generic;
 #{topTop gtop}
 namespace parser {
 public class #{className}#{topInh gtop} {
-  private readonly Lexer lex;
   private readonly bool debug;
   private Stack<(uint state, dynamic value)> stack = new Stack<(uint state, dynamic value)>();
   private static uint[,] Action = new uint[,] {
@@ -45,12 +44,14 @@ public class #{className}#{topInh gtop} {
   static string[] stateNames = new string[] {#{stateToString}};
   static string[] expectedSyms = new string[] {#{expectedSym}};
 
-  public #{className}(Lexer lex, bool debug = false) {
-    this.lex = lex;
+  public #{className}(bool debug = false) {
     this.debug = debug;
   }
-  public dynamic parse() {
-    var a = lex.getNextToken();
+  public dynamic parse(IEnumerable<(TokenType type, dynamic attr)> tokens) {
+    stack.Clear();
+    var iter = tokens.GetEnumerator();
+    iter.MoveNext();
+    var a = iter.Current;
     while (true) {
       var action = Action[top(), (int)a.type];
       switch (action) {
@@ -58,7 +59,8 @@ public class #{className}#{topInh gtop} {
       default:
         if(debug) Console.Error.WriteLine($"Shift to {action}");
         stack.Push((action, a));
-        a=lex.getNextToken();
+        iter.MoveNext();
+        a=iter.Current;
         break;
       }
     }
