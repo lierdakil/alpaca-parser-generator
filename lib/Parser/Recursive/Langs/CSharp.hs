@@ -25,19 +25,19 @@ instance ParserWriter RecursiveParser CSharp where
     [(basename <> ".cs", [interp|
 using lexer;
 using System;
+using System.Collections.Generic;
 #{topTop gtop}
 namespace parser {
 class #{parserOptionsName}#{topInh gtop} {
-  private readonly Lexer lex;
-  private (TokenType type, dynamic attr) curTok;
+  private IEnumerator<(TokenType type, dynamic attr)> iter;
   private readonly bool debug;
   #{indent 1 $ T.intercalate "\n" parsers}
-  public #{parserOptionsName}(Lexer lex, bool debug = false) {
-    this.lex = lex;
+  public #{parserOptionsName}(bool debug = false) {
     this.debug = debug;
-    curTok = lex.getNextToken();
   }
-  public dynamic parse() {
+  public dynamic parse(IEnumerable<(TokenType type, dynamic attr)> tokens) {
+    iter = tokens.GetEnumerator();
+    iter.MoveNext();
     return parse_#{recursiveParserStartRule}();
   }
 }
@@ -66,7 +66,7 @@ class #{parserOptionsName}#{topInh gtop} {
       |] where alts' = map (A.first $ S.map fromJust) $ filter (all isJust . fst) alts
                alt | Just res <- find (S.member Nothing . fst) alts = uncurry makeBody (snd res)
                    | otherwise = [interp|
-                        throw new ApplicationException($"No alternative matched while parsing nonterminal #{h}: {curTok.type}");
+                        throw new ApplicationException($"No alternative matched while parsing nonterminal #{h}: {iter.Current.type}");
                       |]
 
     makeBody :: Body -> Maybe Text -> Text
@@ -91,7 +91,7 @@ class #{parserOptionsName}#{topInh gtop} {
     checkLookahead la = T.intercalate " || " $ map cond $ S.toList la
       where
         cond :: Symbol -> Text
-        cond s = [interp|curTok.type == TokenType.#{tok s}|]
+        cond s = [interp|iter.Current.type == TokenType.#{tok s}|]
 
     tok :: Symbol -> Text
     tok TermEof = "eof"
@@ -105,8 +105,8 @@ class #{parserOptionsName}#{topInh gtop} {
       (NonTerm nt, DoesNotReturnValue)
         -> [interp|parse_#{nt}();|]
       (s', _) -> [interp|
-        if(curTok.type != TokenType.#{tok s'})
-          throw new ApplicationException($"Expected token #{tok s'}, but got {curTok.type}");
-        var _#{n} = curTok.Item2;
-        curTok = lex.getNextToken();
+        if(iter.Current.type != TokenType.#{tok s'})
+          throw new ApplicationException($"Expected token #{tok s'}, but got {iter.Current.type}");
+        var _#{n} = iter.Current.Item2;
+        iter.MoveNext();
         |]

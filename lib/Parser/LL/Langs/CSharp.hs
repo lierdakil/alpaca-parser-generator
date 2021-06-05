@@ -31,27 +31,30 @@ using System.Collections.Generic;
 namespace parser {
 public class #{className}#{topInh gtop} {
   public enum NonTerminal : uint { #{T.intercalate ", " (map ("NT_" <>) nonTerms)} };
-  private readonly Lexer lex;
   private readonly bool debug;
   private Stack<dynamic> stack = new Stack<dynamic>();
   private Stack<dynamic> resultStack = new Stack<dynamic>();
   private static uint[,] M = new uint[,] {
     #{indent 2 $ T.intercalate ",\n" $ map (braces . T.intercalate "," . map showIdx') transTable}
   };
-  public #{className}(Lexer lex, bool debug = false) {
-    this.lex = lex;
+  public #{className}(bool debug = false) {
     this.debug = debug;
   }
-  public dynamic parse() {
+  public dynamic parse(IEnumerable<(TokenType type, dynamic attr)> tokens) {
+    stack.Clear();
+    resultStack.Clear();
+    var iter = tokens.GetEnumerator();
     stack.Push(#{encodeSymbol llStartSymbol});
-    var a = lex.getNextToken();
+    iter.MoveNext();
+    var a = iter.Current;
     while (stack.Count > 0) {
       var x = stack.Pop();
       switch (x) {
       case TokenType X:
         if (a.type == X) {
           resultStack.Push(a);
-          a = lex.getNextToken();
+          iter.MoveNext();
+          a = iter.Current;
         } else {
           throw new ApplicationException($"Found terminal {a.type} but expected {X}.");
         }
