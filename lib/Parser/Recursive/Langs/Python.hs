@@ -3,7 +3,7 @@
   , RecordWildCards
   , MultiParamTypeClasses
   #-}
-module Parser.Recursive.CSharp () where
+module Parser.Recursive.Langs.Python () where
 
 import Grammar
 
@@ -19,79 +19,73 @@ import Parser.Types
 import qualified Control.Arrow as A
 import Parser.Recursive.Build
 
-instance ParserWriter RecursiveParser CSharp where
+instance ParserWriter RecursiveParser Python where
   --writeParser :: forall a. Proxy lang -> ParserOptions a -> parser -> [(FilePath,Text)]
   writeParser _ gtop ParserOptions{..} RecursiveParser{..} =
-    [(basename <> ".cs", [interp|
-using lexer;
-using System;
+    [(basename <> ".py", [interp|
+from lexer import TokenType
 #{topTop gtop}
-namespace parser {
-class #{parserOptionsName}#{topInh gtop} {
-  private readonly Lexer lex;
-  private (TokenType type, dynamic attr) curTok;
-  private readonly bool debug;
-  #{indent 1 $ T.intercalate "\n" parsers}
-  public #{parserOptionsName}(Lexer lex, bool debug = false) {
-    this.lex = lex;
-    this.debug = debug;
-    curTok = lex.getNextToken();
-  }
-  public dynamic parse() {
-    return parse_#{recursiveParserStartRule}();
-  }
-}
-}
+class #{parserOptionsName}#{topInh gtop}:
+    def __init__(self, debug = False):
+        self.debug = debug
+
+    #{indent 1 $ T.intercalate "\n" parsers}
+
+    def parse(self, tokens):
+        self.lex = tokens
+        self.curTok = next(self.lex)
+        return self.parse_#{recursiveParserStartRule}()
 |])]
     where
     RecursiveParserItem recursiveParserStartRule _ _ :| _ = recursiveParserParsers
     basename = parserOptionsBaseFileName
-    indent = indentLang 2
+    indent = indentLang 4
     parsers :: [Text]
     parsers = map makeOneParser $ NE.toList recursiveParserParsers
 
+    printDebug :: Text -> Text
+    printDebug t = [interp|if self.debug: print("#{t}")|]
+
     makeOneParser :: RecursiveParserItem -> Text
     makeOneParser RecursiveParserItem{..} = [interp|
-      private dynamic parse_#{recursiveParserItemHead}() {
-        #{indent 1 $ makeAlternatives recursiveParserItemHead recursiveParserItemAlternatives }
-      }
+      def parse_#{recursiveParserItemHead}(self):
+          #{indent 1 $ makeAlternatives recursiveParserItemHead recursiveParserItemAlternatives}
       |]
 
     makeAlternatives :: Text -> RecursiveParserItemAlternatives -> Text
     makeAlternatives _ (SingleBody b act) = makeBody b act
     makeAlternatives h (MultiBody alts) = [interp|
-      #{T.intercalate " else " $ map (uncurry makeAlt) alts'} else {
-        #{indent 1 alt}
-      }
+      #{T.intercalate "\nel" $ map (uncurry makeAlt) alts'}
+      else:
+          #{indent 1 alt}
       |] where alts' = map (A.first $ S.map fromJust) $ filter (all isJust . fst) alts
                alt | Just res <- find (S.member Nothing . fst) alts = uncurry makeBody (snd res)
                    | otherwise = [interp|
-                        throw new ApplicationException($"No alternative matched while parsing nonterminal #{h}: {curTok.type}");
+                      raise Exception("No alternative matched while parsing nonterminal #{h}:" + str(self.curTok[0]));
                       |]
 
     makeBody :: Body -> Maybe Text -> Text
     makeBody (Body debug syms) act = [interp|
-      if (debug) Console.Error.WriteLine("#{debug}");
+      #{printDebug debug}
       #{T.intercalate "\n" $ map (uncurry makeBodySym) $ zip [1::Word ..] syms}
       #{writeAction act}
       |]
 
+    makeAlt :: S.Set Symbol -> (Body, Maybe Text) -> Text
+    makeAlt s (b, act) = [interp|
+        if #{checkLookahead s}:
+            #{indent 1 $ makeBody b act}
+        |]
+
+    checkLookahead :: S.Set Symbol -> Text
+    checkLookahead la = T.intercalate " or " $ map cond $ S.toList la
+      where
+        cond :: Symbol -> Text
+        cond s = [interp|self.curTok[0] == TokenType.#{tok s}|]
+
     writeAction :: Maybe Text -> Text
     writeAction Nothing = ""
     writeAction (Just a) = [interp|return #{T.strip a};|]
-
-    makeAlt :: S.Set Symbol -> (Body, Maybe Text) -> Text
-    makeAlt s (b, act) = [interp|
-      if(#{checkLookahead s}){
-        #{indent 1 $ makeBody b act}
-      }
-      |]
-
-    checkLookahead :: S.Set Symbol -> Text
-    checkLookahead la = T.intercalate " || " $ map cond $ S.toList la
-      where
-        cond :: Symbol -> Text
-        cond s = [interp|curTok.type == TokenType.#{tok s}|]
 
     tok :: Symbol -> Text
     tok TermEof = "eof"
@@ -101,12 +95,12 @@ class #{parserOptionsName}#{topInh gtop} {
     makeBodySym :: Word -> (Symbol, RecursiveParserItemDoesReturn) -> Text
     makeBodySym n s = case s of
       (NonTerm nt, DoesReturnValue)
-        -> [interp|dynamic _#{n} = parse_#{nt}();|]
+        -> [interp|_#{n} = self.parse_#{nt}();|]
       (NonTerm nt, DoesNotReturnValue)
-        -> [interp|parse_#{nt}();|]
+        -> [interp|self.parse_#{nt}();|]
       (s', _) -> [interp|
-        if(curTok.type != TokenType.#{tok s'})
-          throw new ApplicationException($"Expected token #{tok s'}, but got {curTok.type}");
-        var _#{n} = curTok.Item2;
-        curTok = lex.getNextToken();
+        if self.curTok[0] != TokenType.#{tok s'}:
+            raise Exception("Expected token #{tok s'}, but got " + str(self.curTok[0]))
+        _#{n} = self.curTok[1]
+        self.curTok = next(self.lex)
         |]

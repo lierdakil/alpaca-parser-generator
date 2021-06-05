@@ -6,10 +6,10 @@ module Parser.LL (
 
 import Parser.Types
 import Parser.LL.Build
-import Parser.LL.CPP()
-import Parser.LL.CSharp()
-import Parser.LL.Python()
-import Parser.LL.JS()
+import Parser.LL.Langs.CPP()
+import Parser.LL.Langs.CSharp()
+import Parser.LL.Langs.Python()
+import Parser.LL.Langs.JS()
 import Data.Proxy
 
 llParser :: Proxy LLParser

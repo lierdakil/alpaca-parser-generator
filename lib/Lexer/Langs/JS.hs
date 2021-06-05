@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 {-# LANGUAGE QuasiQuotes, OverloadedStrings #-}
-module Lexer.JS() where
+module Lexer.Langs.JS() where
 
 import qualified Data.List.NonEmpty as NE
 import Regex.Parse
