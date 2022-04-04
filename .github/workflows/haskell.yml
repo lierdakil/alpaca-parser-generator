@@ -38,8 +38,6 @@ jobs:
     - name: Copy build config
       if: matrix.config
       run: cp misc/${{ matrix.config }} ./cabal.project.local
-    - name: Cabal configure
-      run: cabal v2-configure
     - uses: actions/cache@v2
       id: cache
       with:
