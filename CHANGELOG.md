@@ -1,3 +1,11 @@
+## 0.3.0.0
+
+-   Fix static Linux build
+-   Use iterator\/generator lexer formulation in C#, Python, JS
+-   Move language implementations into separate namespaces
+-   Escape non-printable characters in lexer
+-   Use utf8 for file I\/O explicitly
+
 ## 0.2.1.1
 
 -   Bump version
