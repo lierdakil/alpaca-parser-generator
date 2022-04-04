@@ -1,12 +1,15 @@
 #!/bin/bash
 
-export alpaca=$(cabal exec -- which alpaca)
+#export alpaca=$(cabal exec -- which alpaca)
+export alpaca=$(which alpaca)
 
 what="$@"
 
 [ -z "$what" ] && what="cpp csharp py nodejs"
 
-export input=${input:-+ 1 * 2 ^ 3 4}
+definput="$(echo -e "+ 1 * 2 ^\t3 4")"
+export input=${input:-$definput}
+echo "$input"
 
 for d in $what; do
   pushd $d

@@ -112,7 +112,7 @@ module.exports = {TokenType, tokToStr, Lexer}
       |]
     charCond = T.intercalate " || " . map charCond1 . NE.toList
     charCond1 :: CharPattern -> Text
-    charCond1 (CChar c) = [interp|curCh === #{tshow c}|]
-    charCond1 (CRange c1 c2) = [interp|(curCh >= #{tshow c1} && curCh <= #{tshow c2})|]
+    charCond1 (CChar c) = [interp|curCh === '#{showChar' JS c}'|]
+    charCond1 (CRange c1 c2) = [interp|(curCh >= '#{showChar' JS c1}' && curCh <= '#{showChar' JS c2}')|]
     charCond1 CAny = "true"
     charCond1 (CNot c) = "!(" <> charCond1 c <> ")"

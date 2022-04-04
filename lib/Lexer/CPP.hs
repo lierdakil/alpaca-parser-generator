@@ -107,7 +107,7 @@ Token Lexer::getNextToken() {
       _ -> "," <> act
     checkChars (charGroup, newSt) = "if(" <> charCond charGroup <> ") goto state_" <> tshow newSt <> ";"
     charCond = T.intercalate "||" . map charCond1 . NE.toList
-    charCond1 (CChar c) = "curCh == " <> tshow c
-    charCond1 (CRange c1 c2) = "(curCh >= " <> tshow c1 <> " && curCh <= " <> tshow c2 <> ")"
+    charCond1 (CChar c) = [interp|curCh == '#{showChar' CPP c}'|]
+    charCond1 (CRange c1 c2) = [interp|(curCh >= '#{showChar' CPP c1}' && curCh <= '#{showChar' CPP c2}')|]
     charCond1 CAny = "true"
     charCond1 (CNot c) = "!(" <> charCond1 c <> ")"

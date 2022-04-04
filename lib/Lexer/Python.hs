@@ -87,7 +87,7 @@ class Lexer:
           continue
       |]
     charCond = T.intercalate " or " . map charCond1 . NE.toList
-    charCond1 (CChar c) = "curCh == " <> tshow c
-    charCond1 (CRange c1 c2) = "(curCh >= " <> tshow c1 <> " and curCh <= " <> tshow c2 <> ")"
+    charCond1 (CChar c) = [interp|curCh == '#{showChar' Python c}'|] :: Text
+    charCond1 (CRange c1 c2) = [interp|(curCh >= '#{showChar' Python c1}' and curCh <= '#{showChar' Python c2}')|]
     charCond1 CAny = "True"
     charCond1 (CNot c) = "not (" <> charCond1 c <> ")"

@@ -11,6 +11,7 @@ executables:
       - .
       - lib
     main: Main.hs
+    default-extensions: [DataKinds, KindSignatures]
     dependencies:
     - base >=4.12 && <5
     - text >=1.2.3 && <1.3

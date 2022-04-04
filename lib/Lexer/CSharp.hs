@@ -89,8 +89,7 @@ public class Lexer {
       if(#{charCond charGroup}) goto state_#{newSt};
       |]
     charCond = T.intercalate "||" . map charCond1 . NE.toList
-    charCond1 (CChar c) = [interp|curCh == '#{c}'|]
-    charCond1 (CRange c1 c2) =
-      [interp|(curCh >= '#{c1}' && curCh <= '#{c2}')|]
+    charCond1 (CChar c) = [interp|curCh == '#{showChar' CSharp c}'|]
+    charCond1 (CRange c1 c2) = [interp|(curCh >= '#{showChar' CSharp c1}' && curCh <= '#{showChar' CSharp c2}')|]
     charCond1 CAny = "true"
     charCond1 (CNot c) = "!(" <> charCond1 c <> ")"
