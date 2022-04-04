@@ -5,7 +5,7 @@ cabal-version: 1.12
 -- see: https://github.com/sol/hpack
 
 name:           alpaca-parser-generator
-version:        0.2.1.1
+version:        0.3.0.0
 author:         Nikolay Yakimov
 maintainer:     root@livid.pp.ru
 license:        MIT
@@ -23,35 +23,35 @@ executable alpaca
       Lang
       Lexer
       Lexer.Build
-      Lexer.CPP
-      Lexer.CSharp
       Lexer.FA
-      Lexer.JS
-      Lexer.Python
+      Lexer.Langs.CPP
+      Lexer.Langs.CSharp
+      Lexer.Langs.JS
+      Lexer.Langs.Python
       Lexer.Types
       MonadTypes
       Orphans
       Parser.LL
       Parser.LL.Build
-      Parser.LL.CPP
-      Parser.LL.CSharp
-      Parser.LL.JS
-      Parser.LL.Python
+      Parser.LL.Langs.CPP
+      Parser.LL.Langs.CSharp
+      Parser.LL.Langs.JS
+      Parser.LL.Langs.Python
       Parser.LR
       Parser.LR.Build
-      Parser.LR.CPP
-      Parser.LR.CSharp
-      Parser.LR.JS
       Parser.LR.LALR
+      Parser.LR.Langs.CPP
+      Parser.LR.Langs.CSharp
+      Parser.LR.Langs.JS
+      Parser.LR.Langs.Python
       Parser.LR.Point
-      Parser.LR.Python
       Parser.LR.SLR
       Parser.Recursive
       Parser.Recursive.Build
-      Parser.Recursive.CPP
-      Parser.Recursive.CSharp
-      Parser.Recursive.JS
-      Parser.Recursive.Python
+      Parser.Recursive.Langs.CPP
+      Parser.Recursive.Langs.CSharp
+      Parser.Recursive.Langs.JS
+      Parser.Recursive.Langs.Python
       Parser.Types
       Regex.Lex
       Regex.Parse
