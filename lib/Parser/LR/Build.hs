@@ -172,7 +172,7 @@ pointClosure r = unify . flip evalState S.empty . fmap S.unions . mapM doAdd . S
       modify (S.insert p)
       let alts = case M.lookup nt r of
             Just x -> x
-            Nothing -> error $ "Unknown non-terminal \"" <> nt <> "\""
+            Nothing -> error . T.unpack $ "Unknown non-terminal \"" <> nt <> "\""
           new = map (\BodyWithAction{..} -> makeFirstPoint r p nt bwaBody beta bwaAction bwaAssoc) $ NE.toList alts
       S.union (S.fromList (p : new)) . S.unions <$> mapM doAdd new
     else return S.empty
