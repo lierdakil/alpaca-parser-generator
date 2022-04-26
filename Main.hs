@@ -29,10 +29,10 @@ runProgram :: (LexerWriter lang, ParserWriter parser lang) =>
               Proxy lang -> Proxy parser -> MainProgram
 runProgram lang parserMethod debugLexer parserName baseFileName inputFile = do
   input <- decodeUtf8 <$> BS.readFile inputFile
-  let (lexicRaw, grammarLines) = second (drop 1) . break ((=="%%") . T.filter (/='\r')) $ T.lines input
+  let (lexicRaw, grammarLines) = second (drop 1) . break (=="%%") $ T.lines $ T.filter (/='\r') input
       rootdir = takeDirectory inputFile
       grammar = T.unlines grammarLines
-      lexic = filter (not . T.null) lexicRaw
+      lexic = filter (not . T.null . T.strip) lexicRaw
   setCurrentDirectory rootdir
   runInIO $ do
     writeFiles =<< makeLexer lang debugLexer lexic
