@@ -65,10 +65,10 @@ langTbl = [
 
 data ParserProxy = forall p.
   ( Parser p
-  , ParserWriter p CPP
-  , ParserWriter p CSharp
-  , ParserWriter p Python
-  , ParserWriter p JS
+  , ParserWriter p 'CPP
+  , ParserWriter p 'CSharp
+  , ParserWriter p 'Python
+  , ParserWriter p 'JS
   ) => ParserProxy { unPP :: Proxy p }
 
 parsTbl :: [([String], ParserProxy)]

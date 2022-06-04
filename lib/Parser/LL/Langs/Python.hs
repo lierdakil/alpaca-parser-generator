@@ -16,7 +16,7 @@ import Grammar
 import qualified Data.Text as T
 import qualified Data.Map as M
 
-instance ParserWriter LLParser Python where
+instance ParserWriter LLParser 'Python where
   -- writeParser :: Proxy lang -> Text -> ParserOptions a -> parser -> [(FilePath,Text)]
   writeParser _ gtop ParserOptions{..} p@LLParser{..} = [ (basename <> ".py", sourceFile) ]
     where

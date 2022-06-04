@@ -11,7 +11,7 @@ import Lexer.Types
 import Lang
 import Utils
 
-instance LexerWriter CSharp where
+instance LexerWriter 'CSharp where
   writeLexer _ accSt tokNames stList =
     [ ("lexer.cs", [interp|
 using System;
@@ -133,4 +133,4 @@ public class Lexer {
     charCond1 (CChar c) = [interp|curCh == '#{showChar' CSharp c}'|]
     charCond1 (CRange c1 c2) = [interp|(curCh >= '#{showChar' CSharp c1}' && curCh <= '#{showChar' CSharp c2}')|]
     charCond1 CAny = "true"
-    charCond1 (CNot c) = "!(" <> charCond1 c <> ")"
+    charCond1 (CNot c) = "!(" <> charCond c <> ")"

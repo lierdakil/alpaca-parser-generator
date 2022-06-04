@@ -56,7 +56,7 @@ ExpSeq
 
 Single
   : '[' Grp ']'  { (PGroup $2:) }
-  | '[^' Grp ']' { (PGroup (fmap CNot $2):) }
+  | '[^' Grp ']' { (PGroup (pure $ CNot $2):) }
   | Char         { (PGroup (pure $1):) }
   | Single '*'   { (PKleene ($1 []):) }
   | Single '+'   { (PPositive ($1 []):) }
@@ -95,7 +95,7 @@ data CharPattern =
     CChar Char
   | CRange Char Char
   | CAny
-  | CNot CharPattern
+  | CNot (NonEmpty CharPattern)
   deriving (Show, Eq, Ord)
 
 data RegexPatternSingle =

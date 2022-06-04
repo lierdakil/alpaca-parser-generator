@@ -1,4 +1,5 @@
 {-# LANGUAGE TupleSections, OverloadedStrings #-}
+{-# OPTIONS_GHC -Wall -Werror #-}
 module Lexer.FA (
     StateAttr
   , NFA
@@ -57,7 +58,7 @@ showCharPattern (Just (x :| rest)) = foldMap show1 $ x : rest
         show1 (CChar c) = tshow' c
         show1 (CRange a b) = "[" <> tshow' a <> "-" <> tshow' b <> "]"
         show1 CAny = "."
-        show1 (CNot c) = "~" <> show1 c
+        show1 (CNot xs) = "~(" <> showCharPattern (Just xs) <> ")"
         tshow' = T.replace "\\" "\\\\" . tshow
 
 nfaToDFASt :: NFA -> State (Int, IS.IntSet, [(Int, (StateAttr, IS.IntSet))]) DFA
@@ -114,10 +115,17 @@ nfaToDFASt nfa = do
 containsCR :: CharPattern -> CharPattern -> Bool
 containsCR CAny _ = True  -- any contains anything
 containsCR _ CAny = False -- nothing besides any contains any
-containsCR (CNot (CNot a)) b = containsCR a b
-containsCR a (CNot (CNot b)) = containsCR a b
-containsCR (CNot a) (CNot b) = containsCR b a
-containsCR (CNot a) b = not $ containsCR a b
+containsCR (CNot a) (CNot b) = all (not . containsCR (CNot b)) a
+containsCR (CNot a) (CChar x) = and $ do
+  a' <- a
+  pure $ not $ containsCR a' (CChar x)
+containsCR (CNot a) (CRange x y) = and $ do
+  a' <- a
+  pure $ not $ case a' of -- a' intersects range
+    CAny -> True
+    CChar w -> x <= w && w <= y
+    CRange v w -> w >= x || y >= v
+    CNot _ -> error "Negative range in a negative range; this is a bug."
 containsCR _a (CNot _b) = False
 containsCR (CChar c) (CRange a b) = c == a && c == b -- if range is one-character
 containsCR (CChar c1) (CChar c2) = c1 == c2

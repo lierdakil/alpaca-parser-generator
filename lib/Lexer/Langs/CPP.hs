@@ -11,7 +11,7 @@ import Lexer.Types
 import Lang
 import Utils
 
-instance LexerWriter CPP where
+instance LexerWriter 'CPP where
   writeLexer _ accSt tokNames stList =
     [ ("lexer.h", [interp|
 \#ifndef LEXER_H
@@ -110,4 +110,4 @@ Token Lexer::getNextToken() {
     charCond1 (CChar c) = [interp|curCh == '#{showChar' CPP c}'|]
     charCond1 (CRange c1 c2) = [interp|(curCh >= '#{showChar' CPP c1}' && curCh <= '#{showChar' CPP c2}')|]
     charCond1 CAny = "true"
-    charCond1 (CNot c) = "!(" <> charCond1 c <> ")"
+    charCond1 (CNot c) = "!(" <> charCond c <> ")"

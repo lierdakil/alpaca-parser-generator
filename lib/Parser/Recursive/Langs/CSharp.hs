@@ -19,7 +19,7 @@ import Parser.Types
 import qualified Control.Arrow as A
 import Parser.Recursive.Build
 
-instance ParserWriter RecursiveParser CSharp where
+instance ParserWriter RecursiveParser 'CSharp where
   --writeParser :: forall a. Proxy lang -> ParserOptions a -> parser -> [(FilePath,Text)]
   writeParser _ gtop ParserOptions{..} RecursiveParser{..} =
     [(basename <> ".cs", [interp|

@@ -11,7 +11,7 @@ import Lexer.Types
 import Lang
 import Utils
 
-instance LexerWriter JS where
+instance LexerWriter 'JS where
   writeLexer _ accSt tokNames stList =
     [ ("lexer.js", [interp|
 'use strict'
@@ -152,4 +152,4 @@ module.exports = {TokenType, tokToStr, lex}
     charCond1 (CChar c) = [interp|curCh === '#{showChar' JS c}'|]
     charCond1 (CRange c1 c2) = [interp|(curCh >= '#{showChar' JS c1}' && curCh <= '#{showChar' JS c2}')|]
     charCond1 CAny = "true"
-    charCond1 (CNot c) = "!(" <> charCond1 c <> ")"
+    charCond1 (CNot c) = "!(" <> charCond c <> ")"

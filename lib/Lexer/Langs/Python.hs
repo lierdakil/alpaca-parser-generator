@@ -11,7 +11,7 @@ import Lexer.Types
 import Lang
 import Utils
 
-instance LexerWriter Python where
+instance LexerWriter 'Python where
   writeLexer _ accSt tokNames stList =
     [ ("lexer.py", [interp|
 from enum import IntEnum
@@ -122,4 +122,4 @@ def lex(input, debug = False):
     charCond1 (CChar c) = [interp|curCh == '#{showChar' Python c}'|] :: Text
     charCond1 (CRange c1 c2) = [interp|(curCh >= '#{showChar' Python c1}' and curCh <= '#{showChar' Python c2}')|]
     charCond1 CAny = "True"
-    charCond1 (CNot c) = "not (" <> charCond1 c <> ")"
+    charCond1 (CNot c) = "not (" <> charCond c <> ")"

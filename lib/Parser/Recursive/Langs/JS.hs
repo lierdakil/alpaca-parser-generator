@@ -19,7 +19,7 @@ import Parser.Types
 import qualified Control.Arrow as A
 import Parser.Recursive.Build
 
-instance ParserWriter RecursiveParser JS where
+instance ParserWriter RecursiveParser 'JS where
   writeParser _ gtop ParserOptions{..} RecursiveParser{..} =
     [(basename <> ".js", [interp|
 'use strict'

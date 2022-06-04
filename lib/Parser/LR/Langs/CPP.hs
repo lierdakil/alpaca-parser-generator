@@ -21,7 +21,7 @@ import Parser.LR.Point
 import Parser.Types
 import Control.Arrow
 
-instance LRPoint p => ParserWriter (LRParser p) CPP where
+instance LRPoint p => ParserWriter (LRParser p) 'CPP where
   --writeParser :: Proxy lang -> Text -> ParserOptions a -> parser -> [(FilePath,Text)]
   writeParser _ gtop ParserOptions{..} LRParser{..} = [
       (base <> ".h", [interp|

@@ -16,7 +16,7 @@ import Grammar
 import qualified Data.Text as T
 import qualified Data.Map as M
 
-instance ParserWriter LLParser CSharp where
+instance ParserWriter LLParser 'CSharp where
   -- writeParser :: Proxy lang -> Text -> ParserOptions a -> parser -> [(FilePath,Text)]
   writeParser _ gtop ParserOptions{..} p@LLParser{..} = [
       (basename <> ".cs", sourceFile)

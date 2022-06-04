@@ -19,7 +19,7 @@ import Parser.Types
 import qualified Control.Arrow as A
 import Parser.Recursive.Build
 
-instance ParserWriter RecursiveParser Python where
+instance ParserWriter RecursiveParser 'Python where
   --writeParser :: forall a. Proxy lang -> ParserOptions a -> parser -> [(FilePath,Text)]
   writeParser _ gtop ParserOptions{..} RecursiveParser{..} =
     [(basename <> ".py", [interp|
