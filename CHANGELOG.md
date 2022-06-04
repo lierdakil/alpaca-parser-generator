@@ -1,3 +1,15 @@
+## 0.3.0.3
+
+-   Try to fix negative character range bugs (it was pretty broken it turns out)
+
+## 0.3.0.2
+
+-   Fix CR handling in input
+
+## 0.3.0.1
+
+-   Throw meaningful errors on unknown non-terminals.
+
 ## 0.3.0.0
 
 -   Fix static Linux build
