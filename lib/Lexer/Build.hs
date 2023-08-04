@@ -22,13 +22,11 @@ import qualified Data.Text as T
 import Utils
 import Lexer.Types
 import Data.Proxy
-import Debug.Trace
 
 makeLexer :: (LexerWriter lang, Monad m) => Proxy lang
           -> Bool -> [Text] -> MyMonadT m [(FilePath,Text)]
 makeLexer lang outputDebug input = do
   defs <- liftEither . left T.lines $ mapM (fmap regex . scanLine) input
-  traceM $ show defs
   let nfa = evalState (buildNFA defs) 0
       dfa = simplifyDFA . nfaToDFA $ nfa
       debug = if outputDebug
@@ -36,9 +34,6 @@ makeLexer lang outputDebug input = do
         else id
       stList :: [(IM.Key, (StateAttr, [(NonEmpty CharPattern, Int)]))]
       stList = map (second (second (fmap (first snd) . M.toList))) $ IM.toList dfa
-  traceM $ show nfa
-  traceM $ show dfa
-  traceM $ show $ map (second (second M.toList)) $ IM.toList dfa
 
   accSt <- catMaybes <$> mapM (\(f, (s, _)) -> fmap (f,) <$> isSingle f s) stList
   let tokNames = nub $ mapMaybe (\(_, x) -> (, saType x) <$> saName x) accSt
