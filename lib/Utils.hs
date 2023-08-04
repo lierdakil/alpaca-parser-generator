@@ -34,15 +34,19 @@ indentLang indentSize n s = T.intercalate "\n" $ case T.lines s of
 showChar' :: LangS -> Char -> Text
 showChar' l c = case l of
   CPP
+    | c == '\\' -> "\\\\"
     | isAscii c -> if isPrint c then pack [c] else "\\x" <> hex c
     | otherwise -> error "Non-ascii characters are unsupported in C++"
   CSharp
+    | c == '\\' -> "\\\\"
     | isPrint c -> pack [c]
     | otherwise -> "\\U" <> hexU c
   Python
+    | c == '\\' -> "\\\\"
     | isPrint c -> pack [c]
     | otherwise -> "\\U" <> hexU c
   JS
+    | c == '\\' -> "\\\\"
     | isPrint c -> pack [c]
     | otherwise -> "\\u{" <> hexU c <> "}"
 
