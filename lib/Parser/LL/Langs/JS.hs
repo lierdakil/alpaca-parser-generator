@@ -24,7 +24,7 @@ instance ParserWriter LLParser 'JS where
     sourceFile = [interp|
 'use strict'
 
-const {TokenType, tokToStr} = require('./lexer.js')
+import {TokenType, tokToStr} from './lexer.js'
 #{topTop gtop}
 const NonTerminal = {
   #{indent 1 $ T.intercalate ",\n" nonTermDefs}
@@ -44,7 +44,7 @@ const M = [
   #{indent 1 $ T.intercalate ",\n" $ map (braces . T.intercalate "," . map showIdx') transTable}
 ];
 
-class #{className}#{topInh gtop} {
+export class #{className}#{topInh gtop} {
   constructor(debug = false) {
     this.debug = debug
   }
@@ -81,8 +81,6 @@ class #{className}#{topInh gtop} {
     return resultStack.pop()
   }
 }
-
-module.exports = {#{className}}
 |]
     indent = indentLang 2
     nonTermDefs = zipWith nonTermDef [(0::Word) ..] nonTerms

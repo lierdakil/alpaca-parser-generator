@@ -16,12 +16,12 @@ instance LexerWriter 'JS where
     [ ("lexer.js", [interp|
 'use strict'
 
-const TokenType = {
+export const TokenType = {
   eof: 0,
   #{indent 1 tokDefns}
 }
 
-function tokToStr(x) {
+export function tokToStr(x) {
   switch(x) {
     case 0: return '%eof'
     #{indent 2 tokToStr}
@@ -64,7 +64,7 @@ class Buf {
   }
 }
 
-function *lex(input, debug = false) {
+export function *lex(input, debug = false) {
   const inputBuf = new Buf(input)
 
   while(true) {
@@ -107,8 +107,6 @@ function *lex(input, debug = false) {
     throw new Error("Unexpected input: " + buf + tmp)
   }
 }
-
-module.exports = {TokenType, tokToStr, lex}
 |])]
     where
     indent = indentLang 2

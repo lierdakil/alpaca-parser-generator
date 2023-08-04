@@ -26,7 +26,7 @@ instance LRPoint p => ParserWriter (LRParser p) 'JS where
       (base <> ".js", [interp|
 'use strict'
 
-const {TokenType, tokToStr} = require('./lexer.js')
+import {TokenType, tokToStr} from './lexer.js'
 
 #{topTop gtop}
 
@@ -45,7 +45,7 @@ const GOTO = [
   #{indent 1 gotoTable}
   ]
 
-class #{name}#{topInh gtop} {
+export class #{name}#{topInh gtop} {
   constructor(debug=false) {
     this.debug = debug
   }
@@ -69,8 +69,6 @@ class #{name}#{topInh gtop} {
     }
   }
 }
-
-module.exports = {#{name}}
 |])]
     where
     base = parserOptionsBaseFileName

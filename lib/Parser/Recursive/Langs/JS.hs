@@ -24,9 +24,9 @@ instance ParserWriter RecursiveParser 'JS where
     [(basename <> ".js", [interp|
 'use strict'
 
-const {tokToStr, TokenType} = require('./lexer.js')
+import {TokenType, tokToStr} from './lexer.js'
 #{topTop gtop}
-class #{parserOptionsName}#{topInh gtop} {
+export class #{parserOptionsName}#{topInh gtop} {
   constructor(debug = false) {
     this.debug = debug
   }
@@ -39,8 +39,6 @@ class #{parserOptionsName}#{topInh gtop} {
 
   #{indent 1 $ T.intercalate "\n" parsers}
 }
-
-module.exports = {#{parserOptionsName}}
 |])]
     where
     RecursiveParserItem recursiveParserStartRule _ _ :| _ = recursiveParserParsers
