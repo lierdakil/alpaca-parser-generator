@@ -63,6 +63,9 @@ executable alpaca
   default-extensions:
       DataKinds
       KindSignatures
+  build-tools:
+      alex
+    , happy
   build-depends:
       array >=0.5.3 && <0.6
     , base >=4.12 && <5
