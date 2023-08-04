@@ -10,6 +10,7 @@ module Lexer.FA (
   , dfaToGraphviz
   , StateData(..)
   , containsCR
+  , Prio
   ) where
 
 import Regex.Parse (Action, Type, CharPattern(..), Greediness(..))
@@ -30,8 +31,9 @@ import Utils
 
 data StateData = StateData { saNum :: Int, saName :: Maybe Text, saAct :: Action, saType :: Type, saGreed :: Greediness } deriving (Show, Eq, Ord)
 type StateAttr = S.Set StateData
-type NFA = IM.IntMap (StateAttr, M.Map (Maybe (NonEmpty CharPattern)) [Int])
-type DFA = IM.IntMap (StateAttr, M.Map (NonEmpty CharPattern) Int)
+type Prio = Int
+type NFA = IM.IntMap (StateAttr, M.Map (Maybe (Prio, NonEmpty CharPattern)) [Int])
+type DFA = IM.IntMap (StateAttr, M.Map (Prio, NonEmpty CharPattern) Int)
 
 nfaToGraphviz :: NFA -> Text
 nfaToGraphviz fa = "digraph{rankdir=LR;" <> foldMap node l <> "}"
@@ -40,7 +42,7 @@ nfaToGraphviz fa = "digraph{rankdir=LR;" <> foldMap node l <> "}"
                                   <> foldMap (trans i) (M.toList t)
                            where lbl = mapMaybe saName $ S.toList a
                                  acc = if not $ null lbl then ", peripheries=2" else ""
-        trans i (c, ss) = foldMap (\s -> tshow i <> " -> " <> tshow s <> "[label=\""<> showCharPattern c<>"\"];") ss
+        trans i (c, ss) = foldMap (\s -> tshow i <> " -> " <> tshow s <> "[label=\""<> showCharPattern (fmap snd c) <>"\"];") ss
 
 dfaToGraphviz :: DFA -> Text
 dfaToGraphviz fa = "digraph{rankdir=LR;" <> foldMap node l <> "}"
@@ -49,7 +51,7 @@ dfaToGraphviz fa = "digraph{rankdir=LR;" <> foldMap node l <> "}"
                                   <> foldMap (trans i) (M.toList t)
                            where lbl = mapMaybe saName $ S.toList a
                                  acc = if not $ null lbl then ", peripheries=2" else ""
-        trans i (c, ss) = (\s -> tshow i <> " -> " <> tshow s <> "[label=\""<> showCharPattern (Just c)<>"\"];") ss
+        trans i ((_, c), ss) = (\s -> tshow i <> " -> " <> tshow s <> "[label=\""<> showCharPattern (Just c)<>"\"];") ss
 
 showCharPattern :: Maybe (NonEmpty CharPattern) -> Text
 showCharPattern Nothing = "ε"
@@ -60,6 +62,12 @@ showCharPattern (Just (x :| rest)) = foldMap show1 $ x : rest
         show1 CAny = "."
         show1 (CNot xs) = "~(" <> showCharPattern (Just xs) <> ")"
         tshow' = T.replace "\\" "\\\\" . tshow
+
+newtype Min a = Min { getMin :: a }
+  deriving (Eq, Ord)
+
+instance Ord a => Semigroup (Min a) where
+  (<>) = min
 
 nfaToDFASt :: NFA -> State (Int, IS.IntSet, [(Int, (StateAttr, IS.IntSet))]) DFA
 nfaToDFASt nfa = do
@@ -84,25 +92,30 @@ nfaToDFASt nfa = do
   u0 (a1, m1) (a2, m2) = (a1 <> a2, M.unionWith u1 m1 m2)
   u1 a b = if a == b then a else error "Multiple-state transition in DFA"
   moves = M.toList . enrich . M.unionsWith (<>) . map moves1 . IS.toList
+  moves1 :: IS.Key -> M.Map (Prio, NonEmpty CharPattern) IS.IntSet
   moves1 st
     | Just (_, trans) <- IM.lookup st nfa
     = M.map IS.fromList . M.mapKeysMonotonic fromJust . M.delete Nothing $ trans
     | otherwise = M.empty
   -- this computes transitive closure of xs over `contains` defined below
   -- using dfs; also removes duplication
+  enrich :: M.Map (Prio, NonEmpty CharPattern) IS.IntSet -> M.Map (Prio, NonEmpty CharPattern) IS.IntSet
   enrich xs =
-    let ks = S.toList . S.fromList $ concatMap NE.toList $ M.keys xs
-        xs' = M.fromListWith (<>) [(k, v) | (k1, v) <- M.toList xs, k <- NE.toList k1]
+    let ks :: [(Prio, CharPattern)]
+        ks = S.toList . S.fromList $ concatMap (\(p, cs) -> (p,) <$> NE.toList cs) $ M.keys xs
+        xs' :: M.Map CharPattern IS.IntSet
+        xs' = M.fromListWith (<>) [(k, v) | (k1, v) <- M.toList xs, k <- NE.toList $ snd k1]
         es = M.fromListWith (<>)
-              [ (k1, [k2]) | k1 <- ks, k2 <- ks, k1 /= k2, containsCR k2 k1 ]
-        getRow k = (S.singleton k, IS.unions $ map (xs' M.!) $ dfs es S.empty [k])
-        mergeKeys = swapMap . swapMap
+              [ (k1, [k2]) | k1 <- ks, k2 <- ks, k1 /= k2, containsCR (snd k2) (snd k1) ]
+        getRow :: (Prio, CharPattern) -> ((Prio, S.Set CharPattern), IS.IntSet)
+        getRow k@(p, cs) = ((p, S.singleton cs), IS.unions $ map ((xs' M.!) . snd) $ dfs es S.empty [k])
+        mergeKeys = M.mapKeysMonotonic (first getMin) . swapMap . swapMap . M.mapKeysMonotonic (first Min)
         swapMap :: (Ord k, Ord v, Semigroup k) => M.Map k v -> M.Map v k
         swapMap = M.fromListWith (<>) . map swap . M.toList
         setToNE s = case S.toList s of
           (x:xss) -> x NE.:| xss
           _ -> error "empty option"
-    in M.mapKeysMonotonic setToNE $ mergeKeys $ M.fromListWith (<>) $ map getRow ks
+    in M.mapKeysMonotonic (second setToNE) $ mergeKeys $ M.fromListWith (<>) $ map getRow ks
   dfs _ vis [] = S.toList vis
   dfs g vis (x:xs)
     | x `S.member` vis = dfs g vis xs

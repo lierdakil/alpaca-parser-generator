@@ -9,8 +9,6 @@ import qualified Data.Set as S
 import Control.Monad.State
 import qualified Data.IntMap as IM
 import Data.List.NonEmpty (NonEmpty(..))
-import qualified Data.List.NonEmpty as NE
-import Data.Function (on)
 import Data.List
 import Data.Maybe
 import Control.Arrow
@@ -24,17 +22,23 @@ import qualified Data.Text as T
 import Utils
 import Lexer.Types
 import Data.Proxy
+import Debug.Trace
 
 makeLexer :: (LexerWriter lang, Monad m) => Proxy lang
           -> Bool -> [Text] -> MyMonadT m [(FilePath,Text)]
 makeLexer lang outputDebug input = do
   defs <- liftEither . left T.lines $ mapM (fmap regex . scanLine) input
+  traceM $ show defs
   let nfa = evalState (buildNFA defs) 0
       dfa = simplifyDFA . nfaToDFA $ nfa
       debug = if outputDebug
         then (("nfa.gv", nfaToGraphviz nfa) :) . (("dfa.gv", dfaToGraphviz dfa) :)
         else id
-      stList = map (second (second (sortCharPatterns . M.toList))) $ IM.toList dfa
+      stList :: [(IM.Key, (StateAttr, [(NonEmpty CharPattern, Int)]))]
+      stList = map (second (second (fmap (first snd) . M.toList))) $ IM.toList dfa
+  traceM $ show nfa
+  traceM $ show dfa
+  traceM $ show $ map (second (second M.toList)) $ IM.toList dfa
 
   accSt <- catMaybes <$> mapM (\(f, (s, _)) -> fmap (f,) <$> isSingle f s) stList
   let tokNames = nub $ mapMaybe (\(_, x) -> (, saType x) <$> saName x) accSt
@@ -53,41 +57,30 @@ makeLexer lang outputDebug input = do
     showSD StateData{saName=Nothing, saNum=num}
       = "<unnamed> (line " <> tshow num <> ")"
 
-sortCharPatterns :: [(NonEmpty CharPattern, Int)] -> [(NonEmpty CharPattern, Int)]
-sortCharPatterns = sortBy (cmp `on` fst)
-  where
-    cmp a b | bina && ainb = EQ
-            | bina = GT
-            | ainb = LT
-            | otherwise = compare (length a) (length b)
-      where ainb = contains' b a
-            bina = contains' a b
-    contains' a b = all (\bi -> any (`containsCR` bi) (NE.toList a)) (NE.toList b)
-
 newState :: State Int Int
 newState = state $ \s -> (s+1, s+1)
 
-nonAcc :: M.Map (Maybe (NonEmpty CharPattern)) [Int]
-       -> (StateAttr, M.Map (Maybe (NonEmpty CharPattern)) [Int])
+nonAcc :: M.Map (Maybe (Prio, NonEmpty CharPattern)) [Int]
+       -> (StateAttr, M.Map (Maybe (Prio, NonEmpty CharPattern)) [Int])
 nonAcc = (,) S.empty
 
-regex1ToNFASt :: RegexPatternSingle -> State Int NFA
-regex1ToNFASt (PGroup ch) = do
+regex1ToNFASt :: Prio -> RegexPatternSingle -> State Int NFA
+regex1ToNFASt pr (PGroup ch) = do
   startSt <- get
   endSt <- newState
-  return $ IM.singleton startSt (nonAcc $ M.singleton (Just ch) [endSt])
-regex1ToNFASt (PMaybe pat) = do
+  return $ IM.singleton startSt (nonAcc $ M.singleton (Just (pr, ch)) [endSt])
+regex1ToNFASt pr (PMaybe pat) = do
   s2 <- get
-  nfa <- regexToNFASt pat
+  nfa <- regexToNFASt pr pat
   s3 <- get
   return $ IM.insertWith mapUnion s2 (nonAcc $ M.singleton Nothing [s3]) nfa
-regex1ToNFASt (PKleene pat) = regex1ToNFASt (PMaybe [PPositive pat])
-regex1ToNFASt (PPositive pat) = do
+regex1ToNFASt pr (PKleene pat) = regex1ToNFASt pr (PMaybe [PPositive pat])
+regex1ToNFASt pr (PPositive pat) = do
   s2 <- get
-  nfa <- regexToNFASt pat
+  nfa <- regexToNFASt pr pat
   s3 <- get
   return $ IM.insertWith mapUnion s3 (nonAcc $ M.singleton Nothing [s2]) nfa
-regex1ToNFASt (PAlternative pats) = altNFA True $ map regexToNFASt pats
+regex1ToNFASt pr (PAlternative pats) = altNFA True $ map (regexToNFASt pr) pats
 
 altNFA :: Bool -> [State Int NFA] -> State Int NFA
 altNFA mkEndNode mnfas = do
@@ -113,14 +106,14 @@ mapUnion :: Ord k =>
             -> (StateAttr, M.Map k [a2])
 mapUnion (a, x) (b, y) = (a <> b, M.unionWith (++) x y)
 
-regexToNFASt :: RegexPattern -> State Int NFA
-regexToNFASt = foldr
-  (\p -> (IM.unionWith mapUnion <$> regex1ToNFASt p <*>))
+regexToNFASt :: Prio -> RegexPattern -> State Int NFA
+regexToNFASt pr = foldr
+  (\p -> (IM.unionWith mapUnion <$> regex1ToNFASt pr p <*>))
   (return IM.empty)
 
 regexToNFA :: (Int, Maybe Text, Action, Type, Greediness) -> RegexPattern -> State Int NFA
 regexToNFA (num, name, action, typ, greed) pat = do
-  res1 <- regexToNFASt pat
+  res1 <- regexToNFASt num pat
   lastSt <- get
   return $ IM.insertWith mapUnion lastSt (S.singleton (StateData num name action typ greed), M.empty) res1
 
